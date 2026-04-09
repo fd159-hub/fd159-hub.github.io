@@ -2,71 +2,48 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>GitHub 專案連結產生器</title>
+  <title>GitHub 專案列表</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
-      line-height: 1.6;
-    }
-    input, button {
-      padding: 8px;
-      margin: 5px 0;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    ul {
-      margin-top: 20px;
-      padding-left: 20px;
-    }
-    a {
-      text-decoration: none;
-      color: #0366d6;
-    }
+    body { max-width: 700px; margin: 40px auto; font-family: Arial; }
+    li { margin: 6px 0; }
   </style>
 </head>
 <body>
 
-  <h2>GitHub 專案連結產生器</h2>
+<h2>GitHub 專案列表（自動同步）</h2>
 
-  <label>專案名稱（例如：time）</label>
-  <input type="text" id="projectName" placeholder="輸入專案名稱">
+<ul id="list"></ul>
 
-  <label>說明（例如：計時器）</label>
-  <input type="text" id="description" placeholder="輸入說明">
+<script>
+const USER = "fd159-hub";
 
-  <button onclick="addLink()">新增連結</button>
+async function loadRepos() {
+  const res = await fetch(`https://api.github.com/users/${USER}/repos`);
+  const repos = await res.json();
 
-  <ul id="linkList"></ul>
+  const list = document.getElementById("list");
+  list.innerHTML = "";
 
-  <script>
-    function addLink() {
-      const name = document.getElementById("projectName").value.trim();
-      const desc = document.getElementById("description").value.trim();
+  repos.forEach(repo => {
+    // 只顯示有 GitHub Pages 的 repo（可選）
+    // if (!repo.has_pages) return;
 
-      if (!name || !desc) {
-        alert("請輸入完整資訊");
-        return;
-      }
+    const url = `https://${USER}.github.io/${repo.name}/`;
 
-      const url = `https://fd159-hub.github.io/${name}/`;
+    const li = document.createElement("li");
+    const a = document.createElement("a");
 
-      const li = document.createElement("li");
-      const a = document.createElement("a");
+    a.href = url;
+    a.textContent = repo.description || repo.name;
+    a.target = "_blank";
 
-      a.href = url;
-      a.textContent = desc;
-      a.target = "_blank";
+    li.appendChild(a);
+    list.appendChild(li);
+  });
+}
 
-      li.appendChild(a);
-      document.getElementById("linkList").appendChild(li);
-
-      // 清空欄位
-      document.getElementById("projectName").value = "";
-      document.getElementById("description").value = "";
-    }
-  </script>
+loadRepos();
+</script>
 
 </body>
 </html>
