@@ -15,34 +15,24 @@
 <ul id="list"></ul>
 
 <script>
-const USER = "fd159-hub";
+repos.forEach(repo => {
 
-async function loadRepos() {
-  const res = await fetch(`https://api.github.com/users/${USER}/repos`);
-  const repos = await res.json();
+  if (repo.name === "fd159-hub.github.io") return;
+  if (!repo.has_pages) return;
+  if (repo.fork) return;
 
-  const list = document.getElementById("list");
-  list.innerHTML = "";
+  const url = `https://${USER}.github.io/${repo.name}/`;
 
-  repos.forEach(repo => {
-    // 只顯示有 GitHub Pages 的 repo（可選）
-    // if (!repo.has_pages) return;
+  const li = document.createElement("li");
+  const a = document.createElement("a");
 
-    const url = `https://${USER}.github.io/${repo.name}/`;
+  a.href = url;
+  a.textContent = repo.description || repo.name;
+  a.target = "_blank";
 
-    const li = document.createElement("li");
-    const a = document.createElement("a");
-
-    a.href = url;
-    a.textContent = repo.description || repo.name;
-    a.target = "_blank";
-
-    li.appendChild(a);
-    list.appendChild(li);
-  });
-}
-
-loadRepos();
+  li.appendChild(a);
+  list.appendChild(li);
+});
 </script>
 
 </body>
