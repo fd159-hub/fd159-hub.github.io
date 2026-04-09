@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>GitHub 專案連結產生器</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      line-height: 1.6;
+    }
+    input, button {
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    ul {
+      margin-top: 20px;
+      padding-left: 20px;
+    }
+    a {
+      text-decoration: none;
+      color: #0366d6;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>GitHub 專案連結產生器</h2>
+
+  <label>專案名稱（例如：time）</label>
+  <input type="text" id="projectName" placeholder="輸入專案名稱">
+
+  <label>說明（例如：計時器）</label>
+  <input type="text" id="description" placeholder="輸入說明">
+
+  <button onclick="addLink()">新增連結</button>
+
+  <ul id="linkList"></ul>
+
+  <script>
+    function addLink() {
+      const name = document.getElementById("projectName").value.trim();
+      const desc = document.getElementById("description").value.trim();
+
+      if (!name || !desc) {
+        alert("請輸入完整資訊");
+        return;
+      }
+
+      const url = `https://fd159-hub.github.io/${name}/`;
+
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.textContent = desc;
+      a.target = "_blank";
+
+      li.appendChild(a);
+      document.getElementById("linkList").appendChild(li);
+
+      // 清空欄位
+      document.getElementById("projectName").value = "";
+      document.getElementById("description").value = "";
+    }
+  </script>
+
+</body>
+</html>
