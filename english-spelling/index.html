@@ -18,6 +18,14 @@
 .adminRow button{background:#eee6ff;color:#6140a2;padding:7px 10px;border-radius:8px}
 #userBox{display:flex;gap:6px;align-items:center}#userBox button{background:#f2e8ff;color:#603aa4;border-radius:10px;padding:8px;font-size:13px}
 @media(max-width:700px){.adminRow{grid-template-columns:1fr 1fr;}.adminRow button{font-size:12px}.authCard{padding:18px}.profileBtns button{font-size:17px}#userBox span{display:none}}
+</style><style>
+.resultOverlay{position:fixed;inset:0;z-index:25;pointer-events:none;display:grid;place-items:center;background:#2d235022;animation:resultFade 1.7s ease both}
+.resultStamp{font-size:clamp(48px,10vw,105px);font-weight:1000;border:9px solid currentColor;border-radius:30px;padding:24px 42px;transform:rotate(-12deg);box-shadow:0 14px 28px #0002;background:#fffef6;animation:stampPop .72s cubic-bezier(.2,1.5,.3,1) both}
+.resultStamp.correct{color:#13a068}.resultStamp.wrong{color:#df6b43}
+.resultStamp small{display:block;text-align:center;font-size:clamp(19px,3.5vw,34px);margin-top:3px}
+@keyframes stampPop{0%{opacity:0;transform:scale(2.3) rotate(-18deg)}60%{opacity:1;transform:scale(.91) rotate(-10deg)}100%{opacity:1;transform:scale(1) rotate(-12deg)}}
+@keyframes resultFade{0%,75%{opacity:1}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.resultOverlay,.resultStamp{animation:none}}
 </style></head><body>
 <div id="authGate"><div class="authCard"><div style="font-size:54px">🌟🧒🎓</div><h2>單字星球</h2><p>選擇你的冒險身分</p><div class="profileBtns"><button id="ianLogin">🧒<br>IAN<br><small>開始學習</small></button><button id="adminLogin">🛠️<br>管理者<br><small>管理單字</small></button></div><div id="passwordBox" hidden><p id="passwordPrompt"></p><input id="authPassword" type="password" autocomplete="new-password" placeholder="請輸入管理密碼"><p id="authMessage"></p><button id="authSubmit">登入／設定密碼</button><button id="authBack" style="background:#eee4ff;color:#623f99;border-radius:14px;padding:12px">返回</button></div><p style="font-size:12px;color:#6f6483">本機版：資料僅儲存於目前瀏覽器，不會跨裝置同步</p></div></div>
 <div id="adminScreen" hidden><div class="adminShell"><div class="adminHead"><h2>🛠️ 單字庫管理中心</h2><button id="adminLogout">登出管理者</button></div><p>編修後會立即套用於此瀏覽器。修改既有單字拼法可能讓舊的練習紀錄無法沿用。</p><div class="adminTools"><button id="addLesson">＋ 新增一課</button><button id="exportData">⬇ 匯出單字庫與進度</button><button id="importData">⬆ 匯入備份</button><input type="file" id="importFile" accept=".json,application/json" hidden></div><div class="adminForm"><label>選擇課次 <select id="editLesson"></select></label><label>英文單字 <input id="editEnglish" placeholder="例如 apple"></label><label>中文解釋 <input id="editChinese" placeholder="例如 蘋果"></label><div class="adminTools"><button id="saveWord">儲存單字</button><button id="cancelEdit">取消編輯</button></div><small>Miss／miss 以同組的兩筆詞義保留；新增其他單字時各占一組。</small></div><div id="adminList" class="adminTable"></div></div></div><div class="gate" id="gate"><div class="gatecard"><div style="font-size:70px">🚀🌟</div><h2>單字星球・拼字冒險</h2><p>每一題都會先唸英文，聽完再開始挑戰！<br>點一下開始，開啟語音魔法 🎧</p><button id="start">🎮 開始冒險！</button></div></div>
@@ -62,11 +70,22 @@ let w=current(),n=queue.length;showModeButtons();$('counter').textContent=n?'第
 if(!w){$('cue').textContent='🏆';$('playline').textContent='恭喜完成！';$('next').disabled=true;return}
 if(mode==='listen'){$('cue').textContent='❓';generateOptions(w);$('hint').textContent='聽完發音，選出正確的單字｜'+progressText()}
 if(mode==='tiles'){$('cue').textContent=w.zh;slots(w.en);letterButtons([...w.en],()=>slots(w.en,selected))}
-if(mode==='missing'){let n=Math.min(w.en.length,Math.max(2,2+Math.floor((attempts[stageKey()]||0)/8)));hiddenPositions=randomize([...w.en].map((_,i)=>i)).slice(0,n);$('cue').textContent=w.zh;let reveal=[...w.en];hiddenPositions.forEach(i=>reveal[i]='＿');slots(w.en,reveal);letterButtons(hiddenPositions.map(i=>w.en[i]),()=>{let r=[...w.en];hiddenPositions.forEach((i,j)=>r[i]=selected[j]||'＿');slots(w.en,r)})}
+if(mode==='missing'){let n=Math.min(w.en.length,Math.max(2,2+Math.floor((attempts[stageKey()]||0)/8)));hiddenPositions=randomize([...w.en].map((_,i)=>i)).slice(0,n).sort((a,b)=>a-b);$('cue').textContent=w.zh;let reveal=[...w.en];hiddenPositions.forEach(i=>reveal[i]='＿');slots(w.en,reveal);letterButtons(hiddenPositions.map(i=>w.en[i]),()=>{let r=[...w.en];hiddenPositions.forEach((i,j)=>r[i]=selected[j]||'＿');slots(w.en,r)})}
 if(mode==='picture'){$('cue').textContent=WORD_IMAGES[w.en]||'🖼️';$('cue').classList.add('emoji');slots(w.en);letterButtons([...w.en],()=>slots(w.en,selected))}
 if(mode==='dictation'||mode==='review'){$('cue').textContent=w.zh;$('entry').classList.remove('hidden')}
 $('playline').textContent='🔊 準備發音';setTimeout(()=>{if(w===current()&&screen==='learner')speak()},130)}
-function check(){let w=current();if(!w||checked||pending)return;let ans=mode==='dictation'||mode==='review'?$('entry').value.trim():selected.join('');let ok=ans===w.en;checked=true;attempts[stageKey()]=(attempts[stageKey()]||0)+1;save('ian-attempts-v3',attempts);record(ok);$('feedback').textContent=ok?'🎉 答對了！你真厲害！':'💡 正確答案：'+w.en+'。記住它，下次再挑戰！';$('feedback').className='feedback '+(ok?'good':'bad');$('next').disabled=false;lock(true);$('next').disabled=false;showModeButtons()}
+let feedbackTimer=null;
+function announceResult(ok){
+ const old=document.getElementById('resultOverlay');if(old)old.remove();
+ if(feedbackTimer)clearTimeout(feedbackTimer);
+ const overlay=document.createElement('div');overlay.id='resultOverlay';overlay.className='resultOverlay';overlay.setAttribute('aria-hidden','true');
+ const stamp=document.createElement('div');stamp.className='resultStamp '+(ok?'correct':'wrong');
+ stamp.textContent=ok?'✅ 正確！':'❌ 答錯了';const small=document.createElement('small');small.textContent=ok?'太棒了！':'再加油！';stamp.append(small);overlay.append(stamp);document.body.append(overlay);
+ feedbackTimer=setTimeout(()=>{if(overlay.isConnected)overlay.remove()},1800);
+ if(!('speechSynthesis' in window))return;
+ try{speechSynthesis.cancel();const utter=new SpeechSynthesisUtterance(ok?'正確！太棒了！':'答錯了，再加油！');utter.lang='zh-TW';utter.rate=.87;utter.pitch=1.1;const vs=speechSynthesis.getVoices();const zh=vs.find(v=>v.lang.toLowerCase()==='zh-tw')||vs.find(v=>v.lang.toLowerCase().startsWith('zh'));if(zh)utter.voice=zh;speechSynthesis.speak(utter)}catch(e){}
+}
+function check(){let w=current();if(!w||checked||pending)return;let ans=mode==='dictation'||mode==='review'?$('entry').value.trim():mode==='missing'?(()=>{let letters=[...w.en];hiddenPositions.forEach((position,i)=>{letters[position]=selected[i]||''});return letters.join('')})():selected.join('');let ok=ans===w.en;checked=true;attempts[stageKey()]=(attempts[stageKey()]||0)+1;save('ian-attempts-v3',attempts);record(ok);$('feedback').textContent=ok?'🎉 答對了！你真厲害！':'💡 正確答案：'+w.en+'。記住它，下次再挑戰！';$('feedback').className='feedback '+(ok?'good':'bad');announceResult(ok);$('next').disabled=false;lock(true);$('next').disabled=false;showModeButtons()}
 function next(){if(!checked)return;if(idx<queue.length-1){idx++}else{makeQueue()}render()}
 function pickMode(m){if(!isUnlocked(m))return;mode=m;makeQueue();render()}
 function editLessonSelect(){let el=$('editLesson');el.innerHTML='';lessons.forEach((l,i)=>{let op=document.createElement('option');op.value=i;op.textContent=l.title;el.append(op)});drawAdminList()}
