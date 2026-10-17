@@ -93,9 +93,13 @@ function slots(t,display=[]){$('slots').replaceChildren();[...t].forEach((l,i)=>
 function shuffleDifferent(a){const original=a.join('');if(new Set(a).size<2)return a.slice();for(let i=0;i<30;i++){const candidate=randomize(a);if(candidate.join('')!==original)return candidate}const first=a.findIndex(ch=>ch!==a[0]);const rotated=a.slice(first).concat(a.slice(0,first));return rotated.join('')===original?a.slice().reverse():rotated}
 function missingPositions(word,count){const chars=[...word],positions=chars.map((_,i)=>i);let result=[];for(let i=0;i<50;i++){const p=randomize(positions).slice(0,count).sort((a,b)=>a-b);result=p;if(new Set(p.map(index=>chars[index])).size>1)break}if(new Set(result.map(i=>chars[i])).size<2&&new Set(chars).size>1){const a=positions.find(i=>chars[i]!==chars[0]);result=[0,a,...positions.filter(i=>i!==0&&i!==a)].slice(0,count).sort((x,y)=>x-y)}return result}
 function letterButtons(a,callback,forceDifferent=false){$('tiles').replaceChildren();const arranged=forceDifferent?shuffleDifferent(a):randomize(a);tiles=arranged.map((ch,i)=>({ch,i}));tiles.forEach((x,i)=>{let b=document.createElement('button');b.className='tile';b.textContent=x.ch;b.onclick=()=>{if(pending||checked||used.includes(i))return;used.push(i);selected.push(x.ch);b.dataset.used='yes';b.disabled=true;callback()};$('tiles').append(b)})}
+const LETTER_NAMES={a:'ay',b:'bee',c:'see',d:'dee',e:'ee',f:'eff',g:'jee',h:'aitch',i:'eye',j:'jay',k:'kay',l:'ell',m:'em',n:'en',o:'oh',p:'pee',q:'cue',r:'ar',s:'ess',t:'tee',u:'you',v:'vee',w:'double you',x:'ex',y:'why',z:'zee'};
 function speakLetter(letter){
  if(!('speechSynthesis' in window))return;
- try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(letter.toUpperCase());u.lang='en-US';u.rate=.78;u.pitch=1;const voices=speechSynthesis.getVoices();const english=voices.find(v=>v.lang.toLowerCase()==='en-us')||voices.find(v=>v.lang.toLowerCase().startsWith('en'));if(english)u.voice=english;speechSynthesis.speak(u)}catch(e){}
+ const name=LETTER_NAMES[letter.toLowerCase()];if(!name)return;
+ try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(name);u.lang='en-US';u.rate=.85;u.pitch=1;
+ const voices=speechSynthesis.getVoices();const english=voices.find(v=>v.lang.toLowerCase()==='en-us')||voices.find(v=>v.lang.toLowerCase().startsWith('en'));if(english)u.voice=english;
+ speechSynthesis.speak(u)}catch(e){}
 }
 function drawAlphabetKeyboard(){
  const kb=$('alphabetKeyboard');kb.replaceChildren();
