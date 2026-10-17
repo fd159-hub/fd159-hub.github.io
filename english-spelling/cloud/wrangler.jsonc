@@ -1,0 +1,1 @@
+{"name":"ian-spelling-api","main":"src/index.js","compatibility_date":"2026-10-17","workers_dev":true,"vars":{"FRONTEND_ORIGIN":"https://fd159-hub.github.io"},"d1_databases":[{"binding":"DB","database_name":"ian-spelling-db","database_id":"REPLACE_WITH_D1_DATABASE_UUID","migrations_dir":"migrations"}]}
