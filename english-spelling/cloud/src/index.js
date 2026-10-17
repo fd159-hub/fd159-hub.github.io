@@ -1,7 +1,7 @@
 const MODES=['listen','tiles','missing','picture','dictation','review'];
 const enc=new TextEncoder();
 const json=(v,status=200,headers={})=>new Response(JSON.stringify(v),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers}});
-const b64=a=>btoa(String.fromCharCode(...new Uint8Array(a))).replace(/=/g,'').replace(/\\+/g,'-').replace(/\\//g,'_');
+const b64=a=>btoa(String.fromCharCode(...new Uint8Array(a))).replaceAll('=','').replaceAll('+','-').replaceAll('/','_');
 const unb64=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.length%4)%4)),c=>c.charCodeAt(0));
 const secureEq=(a,b)=>{const x=enc.encode(a),y=enc.encode(b);let diff=x.length^y.length;for(let i=0;i<Math.max(x.length,y.length);i++)diff|=(x[i]||0)^(y[i]||0);return diff===0};
 async function sign(payload,key){const k=await crypto.subtle.importKey('raw',enc.encode(key),{name:'HMAC',hash:'SHA-256'},false,['sign']);const body=b64(enc.encode(JSON.stringify(payload)));return body+'.'+b64(await crypto.subtle.sign('HMAC',k,enc.encode(body)))}
