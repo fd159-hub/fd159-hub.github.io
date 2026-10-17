@@ -39,6 +39,11 @@
 @keyframes wordReveal{from{opacity:0;transform:translateY(40px) scale(.5)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes fall{to{transform:translateY(115vh) rotate(680deg)}}
 @media(prefers-reduced-motion:reduce){.answerCard,.answerWord,.confetti i{animation:none}.confetti i{display:none}}
+</style><style>
+.answerWord.typingWord{font-size:clamp(62px,12vw,120px);letter-spacing:0;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:.025em;animation:none;line-height:1.16;min-height:1.25em;overflow-wrap:anywhere}
+.typedLetter{display:inline-block;opacity:0;transform:translateY(16px) scale(.7);animation:letterType .32s ease-out both}
+@keyframes letterType{to{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.typedLetter{animation:none;opacity:1;transform:none}}
 </style></head><body>
 <div id="authGate"><div class="authCard"><div style="font-size:54px">🌟🧒🎓</div><h2>單字星球</h2><p>選擇你的冒險身分</p><div class="profileBtns"><button id="ianLogin">🧒<br>IAN<br><small>開始學習</small></button><button id="adminLogin">🛠️<br>管理者<br><small>管理單字</small></button></div><div id="passwordBox" hidden><p id="passwordPrompt"></p><input id="authPassword" type="password" autocomplete="new-password" placeholder="請輸入管理密碼"><p id="authMessage"></p><button id="authSubmit">登入／設定密碼</button><button id="authBack" style="background:#eee4ff;color:#623f99;border-radius:14px;padding:12px">返回</button></div><p style="font-size:12px;color:#6f6483">本機版：資料僅儲存於目前瀏覽器，不會跨裝置同步</p></div></div>
 <div id="adminScreen" hidden><div class="adminShell"><div class="adminHead"><h2>🛠️ 單字庫管理中心</h2><button id="adminLogout">登出管理者</button></div><p>編修後會立即套用於此瀏覽器。修改既有單字拼法可能讓舊的練習紀錄無法沿用。</p><div class="adminTools"><button id="addLesson">＋ 新增一課</button><button id="exportData">⬇ 匯出單字庫與進度</button><button id="importData">⬆ 匯入備份</button><input type="file" id="importFile" accept=".json,application/json" hidden></div><div class="adminForm"><label>選擇課次 <select id="editLesson"></select></label><label>英文單字 <input id="editEnglish" placeholder="例如 apple"></label><label>中文解釋 <input id="editChinese" placeholder="例如 蘋果"></label><div class="adminTools"><button id="saveWord">儲存單字</button><button id="cancelEdit">取消編輯</button></div><small>Miss／miss 以同組的兩筆詞義保留；新增其他單字時各占一組。</small></div><div id="adminList" class="adminTable"></div></div></div><div class="gate" id="gate"><div class="gatecard"><div style="font-size:70px">🚀🌟</div><h2>單字星球・拼字冒險</h2><p>每一題都會先唸英文，聽完再開始挑戰！<br>點一下開始，開啟語音魔法 🎧</p><button id="start">🎮 開始冒險！</button></div></div>
@@ -92,9 +97,30 @@ let feedbackTimer=null;
 function removeResult(){clearTimeout(feedbackTimer);const e=document.getElementById('resultOverlay');if(e)e.remove()}
 function makeOverlay(className){removeResult();const e=document.createElement('div');e.id='resultOverlay';e.className='resultOverlay '+className;document.body.append(e);return e}
 function speakFeedback(message){if(!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(message);u.lang='zh-TW';u.rate=.86;u.pitch=1.08;let v=speechSynthesis.getVoices().find(x=>x.lang.toLowerCase()==='zh-tw');if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
-function showAnswer(w){const overlay=makeOverlay('answerReveal');const card=document.createElement('div');card.className='answerCard';const symbol=document.createElement('div');symbol.textContent='💡';const heading=document.createElement('div');heading.className='answerHeading';heading.textContent='正確拼字';const word=document.createElement('div');word.className='answerWord';word.textContent=w.en;const meaning=document.createElement('div');meaning.className='answerMeaning';meaning.textContent=w.zh;const button=document.createElement('button');button.className='action';button.textContent='我記住了 ➜ 下一題';button.onclick=()=>{removeResult();transitionBusy=false;next()};card.append(symbol,heading,word,meaning,button);overlay.append(card);feedbackTimer=setTimeout(()=>{removeResult();transitionBusy=false;next()},4800)}
+function showAnswer(w){
+ const overlay=makeOverlay('answerReveal');const card=document.createElement('div');card.className='answerCard';
+ const symbol=document.createElement('div');symbol.textContent='💡';
+ const heading=document.createElement('div');heading.className='answerHeading';heading.textContent='正確拼字';
+ const word=document.createElement('div');word.className='answerWord typingWord';word.setAttribute('aria-label',w.en);
+ const meaning=document.createElement('div');meaning.className='answerMeaning';meaning.textContent=w.zh;
+ const button=document.createElement('button');button.className='action';button.textContent='我記住了 ➜ 下一題';button.disabled=true;
+ button.onclick=()=>{removeResult();transitionBusy=false;next()};
+ card.append(symbol,heading,word,meaning,button);overlay.append(card);
+ const letters=[...w.en];letters.forEach((letter,i)=>{let span=document.createElement('span');span.className='typedLetter';span.textContent=letter;span.style.animationDelay=(i*.34)+'s';word.append(span)});
+ feedbackTimer=setTimeout(()=>{button.disabled=false;button.focus()},letters.length*340+430);
+}
 function showStageUnlock(){const nextMode=newlyUnlocked;newlyUnlocked=null;const overlay=makeOverlay('celebration');const confetti=document.createElement('div');confetti.className='confetti';for(let i=0;i<42;i++){const bit=document.createElement('i');bit.style.left=(i*41%100)+'%';bit.style.animationDelay=(i%13*.11)+'s';bit.style.background=['#ffce42','#ff759c','#68cbd0','#9a78ee','#65c88b'][i%5];confetti.append(bit)}const card=document.createElement('div');card.className='answerCard unlockCard';const label=document.createElement('div');label.style.fontSize='56px';label.textContent='🎉🏆🎊';const heading=document.createElement('h2');heading.textContent='恭喜！解鎖新關卡！';const sub=document.createElement('p');sub.textContent=MODE_NAMES[nextMode][0]+' '+MODE_NAMES[nextMode][1];const buttons=document.createElement('div');buttons.className='actions';const again=document.createElement('button');again.className='action light';again.textContent='繼續練習';again.onclick=()=>{removeResult();transitionBusy=false;next()};const onward=document.createElement('button');onward.className='action';onward.textContent='進入下一階段 ➜';onward.onclick=()=>{removeResult();transitionBusy=false;pickMode(nextMode)};buttons.append(again,onward);card.append(label,heading,sub,buttons);overlay.append(confetti,card);speakFeedback('恭喜！解鎖下一關！')}
-function announceResult(ok,w){transitionBusy=true;const overlay=makeOverlay(ok?'success':'error');const stamp=document.createElement('div');stamp.className='resultStamp '+(ok?'correct':'wrong');stamp.textContent=ok?'✅ 正確！':'❌ 答錯了';overlay.append(stamp);speakFeedback(ok?'正確！太棒了！':'答錯了，再加油！');transitionTimer=setTimeout(()=>{removeResult();if(newlyUnlocked){showStageUnlock()}else if(ok){transitionBusy=false;next()}else{showAnswer(w)}},1700)}
+function announceResult(ok,w){
+ transitionBusy=true;
+ if(ok){
+   removeResult();speakFeedback('正確');
+   transitionTimer=setTimeout(()=>{if(newlyUnlocked){showStageUnlock()}else{transitionBusy=false;next()}},1150);
+ }else{
+   const overlay=makeOverlay('error');const stamp=document.createElement('div');stamp.className='resultStamp wrong';stamp.textContent='❌ 答錯了';overlay.append(stamp);
+   speakFeedback('答錯了，再加油！');
+   transitionTimer=setTimeout(()=>{removeResult();showAnswer(w)},1500);
+ }
+}
 function check(){let w=current();if(!w||checked||pending||transitionBusy)return;
 let ans=mode==='dictation'||mode==='review'?$('entry').value.trim():mode==='missing'?(()=>{let letters=[...w.en];hiddenPositions.forEach((position,i)=>{letters[position]=selected[i]||''});return letters.join('')})():selected.join('');
 const ok=ans===w.en;checked=true;attempts[stageKey()]=(attempts[stageKey()]||0)+1;save('ian-attempts-v3',attempts);record(ok);$('feedback').textContent='';$('next').disabled=true;lock(true);showModeButtons();announceResult(ok,w)}
