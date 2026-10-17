@@ -50,7 +50,7 @@
 .alphabetKey.utilityKey{grid-column:span 2;background:#d9ccff;color:#58339b;box-shadow:0 3px 0 #ac95ec;font-size:clamp(13px,1.8vw,20px)}
 .alphabetKey:disabled{opacity:.5}.alphabetKey:focus-visible{outline:3px solid #4c7fe8;outline-offset:2px}
 #entry[readonly]{caret-color:transparent;background:#fff;user-select:none}
-@media(max-width:750px){.alphabetKeyboard{grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}.alphabetKey{min-height:43px;border-radius:9px;font-size:24px}.alphabetKey.utilityKey{grid-column:span 2}}
+@media(max-width:750px){.alphabetKeyboard{grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}.alphabetKey{min-height:43px;border-radius:9px;font-size:clamp(18px,4.8vw,25px);padding:2px}.alphabetKey.utilityKey{grid-column:span 2;font-size:12px}}
 @media(max-height:650px){.alphabetKey{min-height:36px;font-size:20px}.alphabetKeyboard{gap:3px}}
 </style></head><body>
 <div id="authGate"><div class="authCard"><div style="font-size:54px">🌟🧒🎓</div><h2>單字星球</h2><p>選擇你的冒險身分</p><div class="profileBtns"><button id="ianLogin">🧒<br>IAN<br><small>開始學習</small></button><button id="adminLogin">🛠️<br>管理者<br><small>管理單字</small></button></div><div id="passwordBox" hidden><p id="passwordPrompt"></p><input id="authPassword" type="password" autocomplete="new-password" placeholder="請輸入管理密碼"><p id="authMessage"></p><button id="authSubmit">登入／設定密碼</button><button id="authBack" style="background:#eee4ff;color:#623f99;border-radius:14px;padding:12px">返回</button></div><p style="font-size:12px;color:#6f6483">本機版：資料僅儲存於目前瀏覽器，不會跨裝置同步</p></div></div>
