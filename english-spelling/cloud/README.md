@@ -1,6 +1,6 @@
 # IAN 單字星球：Cloudflare Worker + D1
 
-此分支已包含可選雲端前端、後端、舊版備份匯入與自動測試。**Cloudflare 遠端資源與 Secrets 尚未設定，尚未完成遠端驗收，不要合併 main。**
+此分支已包含可選雲端前端、後端、舊版備份匯入與自動測試。**staging 資源設定進行中，尚未完成遠端與真實資料驗收，不要合併 main。** 實際執行狀態見 `TEST_REPORT.md`。
 
 ## 本機驗證
 
@@ -40,7 +40,9 @@ python3 -m http.server 4173
 
 未帶 `cloud` 參數仍為原本本機版。雲端版要求 IAN PIN／管理密碼，session token 只保存在目前分頁的記憶體，重整後需重新登入；不寫入 localStorage 或 sessionStorage。回到本機版會使用原先的本機資料。
 
-## 遠端 staging 部署（尚待執行）
+## 遠端 staging 部署
+
+2026-10-19 已完成登入與資源盤點，建立獨立 D1 `ian-spelling-db-staging`（`9a721721-31ca-49e8-bbbc-a935abe7d1cc`）及獨立 Pages 專案 `ian-spelling-staging`。再次接續時先查詢並使用既有資源，不要重複建立。前端上傳來源必須是隔離的目錄，僅含 `index.html` 與 `cloud-client.js`，不可直接上傳儲存庫或 `cloud` 目錄。正式 GitHub Pages 仍使用 `main /`。
 
 1. `npx wrangler login`，確認登入的是預定使用的 Cloudflare 帳戶。
 2. `npx wrangler d1 create ian-spelling-db-staging`。

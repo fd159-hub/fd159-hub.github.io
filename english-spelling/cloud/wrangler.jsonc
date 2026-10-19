@@ -19,13 +19,13 @@
       "name": "ian-spelling-api-staging",
       "workers_dev": true,
       "vars": {
-        "FRONTEND_ORIGIN": "https://fd159-hub.github.io"
+        "FRONTEND_ORIGIN": "https://ian-spelling-staging.pages.dev"
       },
       "d1_databases": [
         {
           "binding": "DB",
           "database_name": "ian-spelling-db-staging",
-          "database_id": "REPLACE_WITH_STAGING_D1_DATABASE_UUID",
+          "database_id": "9a721721-31ca-49e8-bbbc-a935abe7d1cc",
           "migrations_dir": "migrations"
         }
       ]

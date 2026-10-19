@@ -10,7 +10,7 @@
 | 4. 權限與 CORS | 通過（本機） | 未登入 401、錯誤角色 403、非允許 origin 403、preflight |
 | 5. 作答與解鎖 | 通過（本機） | 連續答對、答錯歸零、大小寫、第三課圖片、零圖片跳關、網路回應遺失重送去重 |
 | 6. 管理與重置 | 通過（本機） | 增改刪、無效 id、刪字清理、指定課次重置隔離 |
-| 7. 遠端 staging | **尚未完成** | Wrangler whoami 明確回報未登入；沒有 Cloudflare 資源、Secret 或遠端部署成功證據 |
+| 7. 遠端 staging | **進行中，尚未通過** | 2026-10-19 Wrangler OAuth 登入成功；獨立 D1 與 Pages 專案已建立；Secrets、migration 與部署尚待完成 |
 | 8. 前端／遷移驗收 | 程式與本機演練通過；**遠端與真實資料待驗收** | 兩個獨立 Chromium context、管理匯入／匯出、原 localStorage 不變；未取得使用者真實備份，未在實體 iPad 或跨網路裝置測試 |
 
 ## 測試組數
@@ -33,8 +33,22 @@
 
 ## 尚待完成
 
-1. 登入正確 Cloudflare 帳戶，建立 staging D1、設定三組新 Secrets、部署 staging Worker。
+1. 完成本機遮蔽輸入三組新 Secrets、套用 staging migration、部署 staging Worker。
 2. 將開發分支放到獨立預覽站並設定 CORS，重跑遠端 API 與兩台實體裝置同步驗收。
 3. 從使用者原本瀏覽器匯出真實 JSON，在 staging 演練、比對及復原；保留原本檔案與 localStorage。
-4. 檢視本 PR 的 GitHub CI 結果。此文件的本機通過結果不表示 GitHub CI 或遠端驗收已通過。
+4. `188d2638` 的 GitHub CI 已確認成功；後續提交須另行確認。此文件的本機通過結果不表示遠端驗收已通過。
 5. 上述門檻完成前，保持 PR open 並且不要合併 main。
+
+## Windows 接續部署紀錄（2026-10-19）
+
+- 接續基準：`188d2638a04958c8a0ec2116cce81f43ce7d1388`，分支 `feat/english-spelling-cloud`，PR #1 狀態 OPEN。
+- npm ci 成功；以隔離的 Node.js 24.22.0 重跑 check、9 項 API 測試、8 組 workerd/Miniflare/D1 測試及 dry-run 打包，均通過。本次沒有重跑本機 Chromium 測試。
+- `188d2638` 的 GitHub Actions [Spelling cloud tests](https://github.com/fd159-hub/fd159-hub.github.io/actions/runs/39207693460) 結果 SUCCESS。
+- 登入後盤點：D1 與 Pages 專案列表原先均為空；`ian-spelling-api-staging` 原先不存在。
+- 已建立獨立 D1：`ian-spelling-db-staging`，UUID `9a721721-31ca-49e8-bbbc-a935abe7d1cc`，APAC。migration 前只讀檢查僅有平台 `_cf_KV` 表，沒有既有學習資料。
+- 已建立獨立 Pages 專案 `ian-spelling-staging`；預定 origin `https://ian-spelling-staging.pages.dev`，**此時尚未部署，不算網址可用驗收**。
+- `wrangler.jsonc` 僅修改 `env.staging` 的 UUID 與 FRONTEND_ORIGIN；正式設定保留。
+- 前端上傳目錄已隔離，僅含 `index.html`（38227 bytes）與 `cloud-client.js`（10275 bytes）；尚未上傳。
+- 正式 GitHub Pages 來源只讀確認為 `main /`，build_type `legacy`；未更改來源。
+- Secrets 等待使用者在本機遮蔽輸入。敏感數值不得出現在 GitHub、命令列、聊天或執行紀錄。輸入工具與非敏感狀態檔均位於儲存庫外。
+- 真實備份尚未取得。尚未送出學生作答，尚未進行真實匯入、課次重置、遠端備份復原或實體裝置驗收；以上均不得標為通過。
