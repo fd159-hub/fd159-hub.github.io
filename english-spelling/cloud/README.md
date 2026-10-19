@@ -1,6 +1,6 @@
 # IAN 單字星球：Cloudflare Worker + D1
 
-此分支已包含可選雲端前端、後端、舊版備份匯入與自動測試。**staging 資源設定進行中，尚未完成遠端與真實資料驗收，不要合併 main。** 實際執行狀態見 `TEST_REPORT.md`。
+此分支已包含可選雲端前端、後端、舊版備份匯入與自動測試。**staging 部署、登入、權限與 CORS 已驗證；真實備份匯入及後續資料驗收尚未完成，不要合併 main。** 實際執行狀態見 `TEST_REPORT.md`。
 
 ## 本機驗證
 
@@ -43,6 +43,11 @@ python3 -m http.server 4173
 ## 遠端 staging 部署
 
 2026-10-19 已完成登入與資源盤點，建立獨立 D1 `ian-spelling-db-staging`（`9a721721-31ca-49e8-bbbc-a935abe7d1cc`）及獨立 Pages 專案 `ian-spelling-staging`。再次接續時先查詢並使用既有資源，不要重複建立。前端上傳來源必須是隔離的目錄，僅含 `index.html` 與 `cloud-client.js`，不可直接上傳儲存庫或 `cloud` 目錄。正式 GitHub Pages 仍使用 `main /`。
+
+- [staging 前端（已連接雲端模式）](https://ian-spelling-staging.pages.dev/?cloud=https://ian-spelling-api-staging.fd159.workers.dev)
+- [staging health](https://ian-spelling-api-staging.fd159.workers.dev/api/health)
+- 僅允許的前端 origin：`https://ian-spelling-staging.pages.dev`。帶部署雜湊的 Pages 網址不在 CORS 白名單，請使用上述固定網址。
+- 已設定三組 staging Secrets；migration 0001、0002 已套用且重跑無待套用項目。真實 JSON 匯入前不做學生作答測試。
 
 1. `npx wrangler login`，確認登入的是預定使用的 Cloudflare 帳戶。
 2. `npx wrangler d1 create ian-spelling-db-staging`。
@@ -91,7 +96,8 @@ npm run deploy:staging
 
 ## 遠端驗收門檻
 
-- [ ] staging Worker／D1 真實建立，三組 Secrets 設定。
+- [x] staging Worker／D1 真實建立，三組 Secrets 設定。
+- [x] 遠端 health、兩種登入／重登入、角色權限與 CORS 驗證；前端僅兩檔部署且內容一致。
 - [ ] 遠端兩種登入、CORS、真實資料讀寫與重登入通過。
 - [ ] 獨立前端預覽站接入；手機／iPad／另一台實體裝置同步驗收。
 - [ ] 真實舊備份先在 staging 演練並人工比對（本機合成測資通過不代表真實資料已遷移）。
