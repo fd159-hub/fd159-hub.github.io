@@ -28,9 +28,10 @@ async function bodyJson(req){
 async function state(env){
   const results=await env.DB.batch([
     env.DB.prepare('SELECT * FROM lessons ORDER BY position'),env.DB.prepare('SELECT * FROM words ORDER BY lesson_id,group_no,id'),
-    env.DB.prepare('SELECT * FROM progress WHERE user_id=?').bind('ian'),env.DB.prepare('SELECT * FROM unlocks WHERE user_id=?').bind('ian')
+    env.DB.prepare('SELECT * FROM progress WHERE user_id=?').bind('ian'),env.DB.prepare('SELECT * FROM unlocks WHERE user_id=?').bind('ian'),
+    env.DB.prepare('SELECT * FROM stage_access WHERE user_id=?').bind('ian')
   ]);
-  return {lessons:results[0].results,words:results[1].results,progress:results[2].results,unlocks:results[3].results,user:'ian'};
+  return {lessons:results[0].results,words:results[1].results,progress:results[2].results,unlocks:results[3].results,stageAccess:results[4].results,user:'ian'};
 }
 async function updateUnlock(env,lesson){
   let stage=(await env.DB.prepare('SELECT stage FROM unlocks WHERE user_id=? AND lesson_id=?').bind('ian',lesson).first())?.stage||0;
@@ -64,7 +65,8 @@ async function attempt(req,env){
   requireValue(typeof b.requestId==='string'&&/^[a-zA-Z0-9_-]{16,80}$/.test(b.requestId),'需要有效 requestId');
   const w=await env.DB.prepare('SELECT * FROM words WHERE id=?').bind(b.wordId).first();requireValue(w,'無此單字',404);
   const stage=await updateUnlock(env,w.lesson_id);
-  requireValue(MODES.indexOf(b.mode)<=stage,'尚未解鎖此關卡',403);
+  const access=await env.DB.prepare("SELECT allowed FROM stage_access WHERE user_id='ian' AND lesson_id=? AND mode=?").bind(w.lesson_id,b.mode).first();
+  requireValue(access?access.allowed===1:MODES.indexOf(b.mode)<=stage,'尚未解鎖此關卡',403);
   requireValue(b.mode!=='picture'||w.image,'此字不適合圖片模式');
   const correct=b.answer===w.spelling,fingerprint=JSON.stringify([b.wordId,b.mode,b.answer]);
   const previous=await env.DB.prepare("SELECT fingerprint FROM requests WHERE user_id='ian' AND request_id=?").bind(b.requestId).first();
@@ -100,12 +102,23 @@ async function importBackup(req,env){
   bulk('words',['id','lesson_id','group_no','spelling','meaning','image'],data.words);
   bulk('progress',['user_id','word_id','mode','correct','wrong','streak','missed'],data.progress);
   bulk('unlocks',['user_id','lesson_id','stage'],data.unlocks);
+  bulk('stage_access',['user_id','lesson_id','mode','allowed'],data.stageAccess);
   // Keep one import inside one D1 transaction; refuse overly large imports rather than partial writes.
   requireValue(q.length<=80,'備份超過單次匯入上限；需另行規劃分批遷移',413);
   try{await env.DB.batch(q)}catch(e){const busy=await env.DB.prepare('SELECT (SELECT COUNT(*) FROM progress)+(SELECT COUNT(*) FROM attempts)+(SELECT COUNT(*) FROM imports) n').first();if(busy.n)throw new ApiError('雲端已有進度或已匯入；不允許覆蓋',409);throw e}
   return json({ok:true,lessons:data.lessons.length,words:data.words.length,warnings:data.warnings});
 }
 async function admin(req,env,path){
+  if(path==='/api/admin/stage-access'&&['POST','DELETE'].includes(req.method)){
+    const b=await bodyJson(req);requireValue(integer(b.lessonId),'課次無效');
+    requireValue(await env.DB.prepare('SELECT id FROM lessons WHERE id=?').bind(b.lessonId).first(),'無此課次',404);
+    if(req.method==='DELETE')await env.DB.prepare("DELETE FROM stage_access WHERE user_id='ian' AND lesson_id=?").bind(b.lessonId).run();
+    else{
+      requireValue(MODES.includes(b.mode)&&typeof b.allowed==='boolean','階段設定無效');
+      await env.DB.prepare("INSERT INTO stage_access(user_id,lesson_id,mode,allowed) VALUES('ian',?,?,?) ON CONFLICT(user_id,lesson_id,mode) DO UPDATE SET allowed=excluded.allowed").bind(b.lessonId,b.mode,Number(b.allowed)).run();
+    }
+    return json({ok:true});
+  }
   if(path==='/api/admin/export'&&req.method==='GET')return json(legacyState(await state(env)));
   if(path==='/api/admin/import'&&req.method==='POST')return importBackup(req,env);
   if(path==='/api/admin/words'&&req.method==='POST'){
@@ -141,7 +154,8 @@ async function handle(req,env){
   if(path==='/api/health'&&req.method==='GET'){
     await env.DB.prepare('SELECT missed FROM progress LIMIT 1').all();
     await env.DB.prepare('SELECT id FROM imports LIMIT 1').all();
-    return json({ok:true,db:true,schema:2});
+    await env.DB.prepare('SELECT allowed FROM stage_access LIMIT 1').all();
+    return json({ok:true,db:true,schema:3});
   }
   if(path==='/api/login'&&req.method==='POST')return login(req,env);
   const u=await session(req,env);requireValue(u,'登入已失效',401);

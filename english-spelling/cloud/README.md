@@ -75,6 +75,19 @@ npm run deploy:staging
 
 ## API
 
+### 各課各階段解鎖開關
+
+管理者登入後，在「選擇課次」選好課，再使用下方「本課各階段解鎖」的六個開關。每個階段獨立設定，不必依序開放；包含聽音辨字、字母排列、消失的字母、看圖拼字、終極默寫與錯題複習。
+
+- 開關變更立即儲存。雲端學生重新載入並登入後取得最新設定，伺服器也會拒絕已關閉階段的作答。
+- 沒有手動設定的階段，沿用原本學習進度自動解鎖。手動關閉優先於自動進度；「恢復本課自動解鎖」只移除該課的手動設定，不清除作答。
+- 六個階段全部關閉時，學生會看到請洽管理者開放的提示，仍可切換其他課次。
+- 重置本課熟練度保留手動開關。若要回到原始解鎖規則，再按「恢復本課自動解鎖」。
+- 本機版新增 `ian-stage-access-v3` 儲存鍵；雲端版使用增量 migration `0003_stage_access.sql`，保留既有進度。version 3 備份新增可選的 `stageAccess` 欄位，舊備份仍可匯入。
+- `POST /api/admin/stage-access`：`{"lessonId":1,"mode":"dictation","allowed":true}`；管理者限定，allowed 必須為布林值。
+- `DELETE /api/admin/stage-access`：`{"lessonId":1}`，恢復本課自動解鎖。
+- health 現在檢查開關資料表並回傳 `schema:3`。
+
 - `GET /api/health`：檢查 DB 與 schema。
 - `POST /api/login`：`{"role":"student","password":"..."}`，或 role=`admin`；token 有效 12 小時。同來源 IP 在 15 分鐘內至多 10 次連續失敗嘗試，成功登入會清除該 IP 計數。
 - `GET /api/state`：已登入者取得 IAN 的 lessons、words、progress、unlocks。

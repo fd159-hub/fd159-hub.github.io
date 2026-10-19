@@ -32,6 +32,16 @@ try{
  assert.equal(await page.evaluate(()=>window.__utterances.at(-1)),'ay');
  await page.locator('.utilityKey').first().click();await page.locator('.alphabetKey').first().click();assert.equal(await page.locator('#entry').inputValue(),'aA');
  await page.locator('.utilityKey').last().click();assert.equal(await page.locator('#entry').inputValue(),'a');groups++;
+ // Local independent switches and the all-closed learner state.
+ await page.evaluate(()=>admin());
+ for(const m of ['listen','tiles','missing','picture','dictation'])await page.locator('[data-stage="'+m+'"]').uncheck();
+ await page.locator('[data-stage="review"]').check();await page.locator('[data-stage="review"]').uncheck();
+ await page.evaluate(()=>{learner();$('start').click()});
+ assert.equal(await page.locator('[data-mode="listen"]').isDisabled(),true);
+ assert.equal(await page.locator('#playline').textContent(),'本課所有階段已關閉，請洽管理者開放。');
+ await page.evaluate(()=>admin());await page.locator('#restoreAutoUnlock').click();
+ assert.equal(await page.locator('[data-stage="dictation"]').isChecked(),true);
+ assert.equal(await page.evaluate(()=>stageUnlock[0]),4);groups++;
  const before=await page.evaluate(()=>JSON.stringify({...localStorage}));
  await page.goto('http://localhost:4173/english-spelling/?cloud=http://localhost:8787');
  await page.locator('#ianLogin').click();await page.locator('#authPassword').fill('test-student-pin');await page.locator('#authSubmit').click();await page.locator('#start').click();
@@ -60,5 +70,18 @@ try{
  await page.locator('#importFile').setInputFiles({name:'legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
  await page.waitForFunction(()=>lessons[0]?.title==='瀏覽器匯入課');assert.equal(await page.locator('.adminRow').count(),2);assert.equal(await page.evaluate(()=>history['0|listen|Miss'].good),2);assert.equal(await page.evaluate(()=>misses['0|miss']),true);groups++;
  await page.setViewportSize({width:1024,height:768});await mkdir(root+'english-spelling/cloud/test-results',{recursive:true});await page.screenshot({path:root+'english-spelling/cloud/test-results/cloud-admin.png',fullPage:true});
+ // Cloud switches persist on the backend and enforce access in a second context.
+ const settled=()=>page.waitForFunction(()=>document.querySelector('#stageAccessStatus').textContent.startsWith('已儲存')&&!document.querySelector('#stageAccessFields').disabled);
+ await page.locator('[data-stage="dictation"]').check();await settled();
+ await page.locator('[data-stage="listen"]').uncheck();await settled();
+ assert.equal((await db.prepare("SELECT allowed FROM stage_access WHERE lesson_id=1 AND mode='dictation'").first()).allowed,1);
+ const accessContext=await browser.newContext();const accessPage=await accessContext.newPage();accessPage.on('pageerror',e=>errors.push(e.message));
+ await accessPage.goto('http://localhost:4173/english-spelling/?cloud=http://localhost:8787');await accessPage.locator('#ianLogin').click();await accessPage.locator('#authPassword').fill('test-student-pin');await accessPage.locator('#authSubmit').click();await accessPage.waitForFunction(()=>document.querySelector('#authGate').hidden);
+ assert.equal(await accessPage.locator('[data-mode="dictation"]').isEnabled(),true);assert.equal(await accessPage.locator('[data-mode="listen"]').isDisabled(),true);
+ await accessPage.locator('#start').click();await accessPage.locator('[data-mode="dictation"]').click();assert.equal(await accessPage.evaluate(()=>mode),'dictation');
+ await page.locator('#restoreAutoUnlock').click();await settled();
+ assert.equal((await db.prepare('SELECT COUNT(*) n FROM stage_access').first()).n,0);
+ assert.equal(await page.locator('[data-stage="listen"]').isChecked(),true);assert.equal(await page.locator('[data-stage="dictation"]').isChecked(),false);
+ assert.equal(await page.evaluate(()=>JSON.stringify({...localStorage})),before);await accessContext.close();groups++;
  assert.deepEqual(errors,[]);console.log('PASS: '+groups+' browser integration groups; no page errors; localStorage unchanged in cloud mode');
 }finally{await browser?.close();await new Promise(r=>staticServer.close(r));await new Promise(r=>apiServer.close(r));await mf.dispose()}

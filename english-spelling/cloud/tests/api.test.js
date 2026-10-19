@@ -20,6 +20,38 @@ test('schema, seed counts, case-sensitive variants and additive migration',()=>{
  assert.throws(()=>db.sqlite.exec("INSERT INTO words(lesson_id,group_no,spelling,meaning) VALUES(99,1,'x','x')"));
  db.sqlite.close();
 });
+
+test('independent stage overrides enforce roles, survive reset, and round-trip backups',async()=>{
+ const env=environment(),admin=await login(env,'admin'),student=await login(env);
+ const set=(body,token=admin,method='POST')=>request(env,'/api/admin/stage-access',body,token,method);
+ assert.equal((await set({lessonId:1,mode:'dictation',allowed:true},student)).status,403);
+ assert.equal((await set({lessonId:999,mode:'listen',allowed:true})).status,404);
+ for(const body of [{lessonId:1,mode:'invalid',allowed:true},{lessonId:1,mode:'tiles',allowed:1},{lessonId:'1',mode:'tiles',allowed:true}])assert.equal((await set(body)).status,400);
+ assert.equal((await set({lessonId:1,mode:'dictation',allowed:true})).status,200);
+ assert.equal((await answer(env,student,1,'dictation','one')).status,200);
+ assert.equal((await answer(env,student,1,'tiles','one')).status,403);
+ assert.equal((await answer(env,student,9,'dictation','two')).status,403);
+ await set({lessonId:1,mode:'listen',allowed:false});
+ const attempts=env.DB.sqlite.prepare('SELECT COUNT(*) n FROM attempts').get().n;
+ assert.equal((await answer(env,student,1,'listen','one')).status,403);
+ assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) n FROM attempts').get().n,attempts);
+ env.DB.sqlite.exec("INSERT INTO unlocks(user_id,lesson_id,stage) VALUES('ian',1,5)");
+ assert.equal((await answer(env,student,1,'listen','one')).status,403);
+ const backup=(await request(env,'/api/admin/export',undefined,admin)).body;
+ assert.equal(backup.stageAccess['0|listen'],false);assert.equal(backup.stageAccess['0|dictation'],true);
+ const fresh=environment(),freshAdmin=await login(fresh,'admin');
+ assert.equal((await request(fresh,'/api/admin/import',{confirm:'IMPORT_BACKUP',backup},freshAdmin)).status,200);
+ assert.deepEqual((await request(fresh,'/api/admin/export',undefined,freshAdmin)).body.stageAccess,backup.stageAccess);
+ const invalid=fixture();invalid.stageAccess={'0|listen':'false'};assert.throws(()=>normalizeBackup(invalid));
+ await request(env,'/api/admin/reset',{lessonId:1},admin);
+ assert.equal((await answer(env,student,1,'dictation','one')).status,200);
+ assert.equal((await answer(env,student,1,'listen','one')).status,403);
+ await set({lessonId:2,mode:'review',allowed:true});
+ await set({lessonId:1},admin,'DELETE');
+ assert.equal((await answer(env,student,1,'dictation','one')).status,403);
+ assert.equal((await answer(env,student,1,'listen','one')).status,200);
+ assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) n FROM stage_access WHERE lesson_id=2').get().n,1);
+});
 test('health queries schema; missing configuration fails closed',async()=>{
  const env=environment();assert.equal((await request(env,'/api/health')).status,200);
  assert.equal((await request({...env,DB:null},'/api/health')).status,503);

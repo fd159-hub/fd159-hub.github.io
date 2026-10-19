@@ -29,7 +29,7 @@
   }
   function applyState(s){
     const oldId=lessons[lesson]?.id,oldEditId=lessons[Number($('editLesson').value)]?.id;
-    lessons=[];history={};misses={};stageUnlock={};attempts={};
+    lessons=[];history={};misses={};stageUnlock={};attempts={};stageAccess={};
     s.lessons.forEach((l,li)=>{
       const groups=new Map();
       s.words.filter(w=>w.lesson_id===l.id).forEach(w=>{
@@ -43,6 +43,7 @@
       });
       lessons.push({id:l.id,title:l.title,words:[...groups.values()].map(v=>v.length===1?v[0]:{variants:v})});
       stageUnlock[li]=s.unlocks.find(u=>u.lesson_id===l.id)?.stage||0;
+      for(const a of s.stageAccess||[])if(a.lesson_id===l.id)stageAccess[li+'|'+a.mode]=Boolean(a.allowed);
     });
     lesson=Math.max(0,lessons.findIndex(l=>l.id===oldId));
     for(const id of ['lesson','editLesson']){
@@ -71,7 +72,7 @@
       const oldStage=Number(stageUnlock[lesson]||0);
       const result=await api('/api/attempt',{wordId:w.id,mode,answer,requestId:pendingAttempt.requestId});
       await refresh();pendingAttempt=null;checked=true;
-      newlyUnlocked=result.stage>oldStage?STAGES[result.stage]:null;
+      newlyUnlocked=result.stage>oldStage&&isUnlocked(STAGES[result.stage])?STAGES[result.stage]:null;
       $('feedback').textContent='';showModeButtons();lock(true);announceResult(result.correct,w);
     }catch(e){$('feedback').className='feedback bad';$('feedback').textContent=e.message+'；請按檢查答案重試';$('check').classList.remove('hidden');lock(false)}finally{busy=false}
   };
@@ -85,6 +86,7 @@
     try{await api(path,body,method);await refresh();editPosition=null;drawAdminList();return true}catch(e){alert(e.message);return false}finally{busy=false}
   }
   drawAdminList=()=>{
+    drawStageAccess();
     const li=Number($('editLesson').value||0);$('adminList').replaceChildren();
     for(const group of lessons[li]?.words||[])for(const w of group.variants||[group]){
       const row=document.createElement('div');row.className='adminRow';
@@ -94,6 +96,10 @@
       del.onclick=()=>{if(confirm('確定從雲端刪除 '+w.en+' 及其學習紀錄？'))mutate('/api/admin/words',{id:w.id},'DELETE')};
       row.append(en,zh,edit,del);$('adminList').append(row);
     }
+  };
+  setStageAccess=async(li,m,allowed)=>{
+    if(busy)return false;
+    return mutate('/api/admin/stage-access',{lessonId:lessons[li].id,...(m===null?{}:{mode:m,allowed})},m===null?'DELETE':'POST');
   };
   $('saveWord').onclick=async()=>{
     const li=editPosition?.li??Number($('editLesson').value),l=lessons[li],all=l.words.flatMap(g=>g.variants||[g]);

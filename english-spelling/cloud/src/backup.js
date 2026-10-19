@@ -4,7 +4,7 @@ const count = x => Number.isSafeInteger(x) && x >= 0 && x <= 10000000;
 const validWord = w => w && typeof w.en==='string' && /^[A-Za-z]+(?:[-'][A-Za-z]+)*$/.test(w.en) && w.en.length<=100 && typeof w.zh==='string' && w.zh.trim().length>0 && w.zh.length<=120;
 export function normalizeBackup(b) {
   if (!b || b.version!==3 || !Array.isArray(b.lessons) || !b.lessons.length || b.lessons.length>100) throw Error('備份格式或版本無效');
-  const lessons=[],words=[],progress=[],unlocks=[];
+  const lessons=[],words=[],progress=[],unlocks=[],stageAccess=[];
   let id=0;
   b.lessons.forEach((l,li)=>{
     if(typeof l.title!=='string'||!l.title.trim()||l.title.length>50||!Array.isArray(l.words)||l.words.length>500)throw Error('課次格式無效');
@@ -23,7 +23,7 @@ export function normalizeBackup(b) {
     });
   });
   if(words.length>2000)throw Error('單字數量過多');
-  const maps=['history','misses','stageUnlock','attempts'];
+  const maps=['history','misses','stageUnlock','attempts','stageAccess'];
   for(const name of maps)if(b[name]!==undefined&&(!b[name]||typeof b[name]!=='object'||Array.isArray(b[name])))throw Error('進度格式無效');
   const byKey=new Map(words.map(w=>[(w.lesson_id-1)+'|'+w.spelling,w]));
   for(const [key,value] of Object.entries(b.history||{})){
@@ -46,10 +46,15 @@ export function normalizeBackup(b) {
   for(const [key,n] of Object.entries(b.attempts||{})){
     const [li,mode,...extra]=key.split('|');if(extra.length||!lessons[Number(li)]||!MODES.includes(mode)||!count(n))throw Error('練習次數格式無效');
   }
-  return {lessons,words,progress,unlocks,warnings:['舊版 good 只代表目前連續答對數；無法還原歷史總答對次數或逐筆作答時間。舊 attempts 是各模式累計次數，保留於原始 JSON，並未偽造為雲端逐筆作答。']};
+  for(const [key,allowed] of Object.entries(b.stageAccess||{})){
+    const [li,mode,...extra]=key.split('|');
+    if(extra.length||!/^(0|[1-9][0-9]*)$/.test(li)||!lessons[Number(li)]||!MODES.includes(mode)||typeof allowed!=='boolean')throw Error('階段開關格式無效');
+    stageAccess.push({user_id:'ian',lesson_id:Number(li)+1,mode,allowed:Number(allowed)});
+  }
+  return {lessons,words,progress,unlocks,stageAccess,warnings:['舊版 good 只代表目前連續答對數；無法還原歷史總答對次數或逐筆作答時間。舊 attempts 是各模式累計次數，保留於原始 JSON，並未偽造為雲端逐筆作答。']};
 }
 export function legacyState(s) {
-  const sorted=s.lessons.slice().sort((a,b)=>a.position-b.position),lessons=[],history={},misses={},stageUnlock={},attempts={};
+  const sorted=s.lessons.slice().sort((a,b)=>a.position-b.position),lessons=[],history={},misses={},stageUnlock={},attempts={},stageAccess={};
   sorted.forEach((l,li)=>{
     const groups=new Map();
     for(const w of s.words.filter(w=>w.lesson_id===l.id)){
@@ -63,6 +68,7 @@ export function legacyState(s) {
     }
     lessons.push({id:l.id,title:l.title,words:[...groups.values()].map(v=>v.length===1?v[0]:{variants:v})});
     stageUnlock[li]=s.unlocks.find(u=>u.lesson_id===l.id)?.stage||0;
+    for(const a of s.stageAccess||[])if(a.lesson_id===l.id)stageAccess[li+'|'+a.mode]=Boolean(a.allowed);
   });
-  return {version:3,lessons,history,misses,stageUnlock,attempts};
+  return {version:3,lessons,history,misses,stageUnlock,attempts,stageAccess};
 }
