@@ -1,4 +1,5 @@
 import {MODES, normalizeBackup, legacyState, normalizeSpelling} from './backup.js';
+import packageInfo from '../package.json' with {type:'json'};
 const enc=new TextEncoder();
 const json=(v,status=200)=>new Response(JSON.stringify(v),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 class ApiError extends Error { constructor(message,status=400){super(message);this.status=status} }
@@ -158,7 +159,7 @@ async function handle(req,env){
     await env.DB.prepare('SELECT missed FROM progress LIMIT 1').all();
     await env.DB.prepare('SELECT id FROM imports LIMIT 1').all();
     await env.DB.prepare('SELECT allowed FROM stage_access LIMIT 1').all();
-    return json({ok:true,db:true,schema:3});
+    return json({ok:true,db:true,schema:3,version:packageInfo.version});
   }
   if(path==='/api/login'&&req.method==='POST')return login(req,env);
   const u=await session(req,env);requireValue(u,'登入已失效',401);

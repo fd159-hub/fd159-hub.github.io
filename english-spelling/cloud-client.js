@@ -1,5 +1,6 @@
 /* Optional cloud mode. The default URL remains the original local application. */
 (()=>{
+  const APP_VERSION='1.0.0';
   const connect=document.createElement('button');connect.textContent='☁️ 連接雲端';connect.style.cssText='margin-top:12px;padding:10px;border-radius:12px';
   document.querySelector('.authCard').append(connect);
   connect.onclick=()=>{const value=prompt('請輸入已部署的 Worker 網址（https://…workers.dev）');if(value){const u=new URL(location.href);u.searchParams.set('cloud',value.trim());location.href=u.href}};
@@ -13,8 +14,9 @@
     document.querySelector('.authCard').replaceChildren(Object.assign(document.createElement('p'),{textContent:'雲端網址無效，請移除網址的 cloud 參數後重試。'}));return;
   }
   connect.textContent='回到本機版';connect.onclick=()=>{const u=new URL(location.href);u.searchParams.delete('cloud');location.href=u.href};
-  document.querySelector('.authCard>p:last-of-type').textContent='雲端版：登入後同步至 '+endpoint;
-  document.querySelector('footer').textContent='雲端同步｜本機舊紀錄保留｜登入憑證只保留於本分頁記憶體';
+  document.querySelector('.authCard>p:last-of-type').textContent='雲端版 v'+APP_VERSION+'：登入後同步至 '+endpoint;
+  document.querySelector('footer').textContent='雲端版 v'+APP_VERSION+'｜本機舊紀錄保留｜登入憑證只保留於本分頁記憶體';
+  const versionBadge=document.createElement('span');versionBadge.textContent='v'+APP_VERSION;versionBadge.style.cssText='font-size:16px;color:#66577d';document.querySelector('.adminHead h2').append(' ',versionBadge);
   document.querySelector('#adminScreen .adminShell>p').textContent='此頁修改會儲存至雲端。匯入僅接受尚無學習進度的資料庫；原瀏覽器紀錄不會刪除。';
   $('exportData').textContent='⬇ 匯出雲端備份';$('importData').textContent='⬆ 匯入舊版備份';
   const localLogout=logout;
