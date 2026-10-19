@@ -38,10 +38,10 @@ async function updateUnlock(env,lesson){
   const start=stage;
   while(stage<5){
     const mode=MODES[stage];
-    const total=await env.DB.prepare("SELECT COUNT(*) n FROM words WHERE lesson_id=? AND (? != 'picture' OR (image IS NOT NULL AND image!=''))").bind(lesson,mode).first();
+    const total=mode==='listen'?await env.DB.prepare("SELECT COUNT(*) n FROM (SELECT group_no,lower(spelling) FROM words WHERE lesson_id=? GROUP BY group_no,lower(spelling))").bind(lesson).first():await env.DB.prepare("SELECT COUNT(*) n FROM words WHERE lesson_id=? AND (? != 'picture' OR (image IS NOT NULL AND image!=''))").bind(lesson,mode).first();
     // Empty picture stages are skipped; a completely empty lesson is not mastered.
     if(!total.n){if(mode==='picture'){stage++;continue}break}
-    const done=await env.DB.prepare("SELECT COUNT(*) n FROM words w JOIN progress p ON p.word_id=w.id AND p.user_id='ian' AND p.mode=? WHERE w.lesson_id=? AND p.streak>=2 AND (? != 'picture' OR (w.image IS NOT NULL AND w.image!=''))").bind(mode,lesson,mode).first();
+    const done=mode==='listen'?await env.DB.prepare("SELECT COUNT(*) n FROM (SELECT w.group_no,lower(w.spelling) FROM words w LEFT JOIN progress p ON p.word_id=w.id AND p.user_id='ian' AND p.mode='listen' WHERE w.lesson_id=? GROUP BY w.group_no,lower(w.spelling) HAVING MAX(COALESCE(p.streak,0))>=2)").bind(lesson).first():await env.DB.prepare("SELECT COUNT(*) n FROM words w JOIN progress p ON p.word_id=w.id AND p.user_id='ian' AND p.mode=? WHERE w.lesson_id=? AND p.streak>=2 AND (? != 'picture' OR (w.image IS NOT NULL AND w.image!=''))").bind(mode,lesson,mode).first();
     if(done.n!==total.n)break;stage++;
   }
   if(stage>start)await env.DB.prepare("INSERT INTO unlocks(user_id,lesson_id,stage) VALUES('ian',?,?) ON CONFLICT(user_id,lesson_id) DO UPDATE SET stage=MAX(stage,excluded.stage)").bind(lesson,stage).run();
@@ -68,7 +68,9 @@ async function attempt(req,env){
   const access=await env.DB.prepare("SELECT allowed FROM stage_access WHERE user_id='ian' AND lesson_id=? AND mode=?").bind(w.lesson_id,b.mode).first();
   requireValue(access?access.allowed===1:MODES.indexOf(b.mode)<=stage,'尚未解鎖此關卡',403);
   requireValue(b.mode!=='picture'||w.image,'此字不適合圖片模式');
-  const correct=b.answer===w.spelling,fingerprint=JSON.stringify([b.wordId,b.mode,b.answer]);
+  // Only same-group case variants share the listening question. Spelling modes stay exact.
+  const listeningGroup=b.mode==='listen'?(await env.DB.prepare('SELECT * FROM words WHERE lesson_id=? AND group_no=?').bind(w.lesson_id,w.group_no).all()).results.filter(v=>v.spelling.toLowerCase()===w.spelling.toLowerCase()):[w];
+  const correct=listeningGroup.some(v=>b.answer===v.spelling),fingerprint=JSON.stringify([b.wordId,b.mode,b.answer]);
   const previous=await env.DB.prepare("SELECT fingerprint FROM requests WHERE user_id='ian' AND request_id=?").bind(b.requestId).first();
   if(previous)requireValue(previous.fingerprint===fingerprint,'requestId 已被其他作答使用',409);
   else{
@@ -76,7 +78,7 @@ async function attempt(req,env){
       const statements=[
         env.DB.prepare("INSERT INTO requests(user_id,request_id,fingerprint) VALUES('ian',?,?)").bind(b.requestId,fingerprint),
         env.DB.prepare("INSERT INTO attempts(user_id,word_id,mode,correct) VALUES('ian',?,?,?)").bind(w.id,b.mode,Number(correct)),
-        env.DB.prepare("INSERT INTO progress(user_id,word_id,mode,correct,wrong,streak,missed) VALUES('ian',?,?,?,?,?,?) ON CONFLICT(user_id,word_id,mode) DO UPDATE SET correct=correct+excluded.correct,wrong=wrong+excluded.wrong,streak=CASE WHEN excluded.correct=1 THEN streak+1 ELSE 0 END,missed=MAX(missed,excluded.missed)").bind(w.id,b.mode,Number(correct),Number(!correct),Number(correct),Number(!correct))
+        ...listeningGroup.map(v=>env.DB.prepare("INSERT INTO progress(user_id,word_id,mode,correct,wrong,streak,missed) VALUES('ian',?,?,?,?,?,?) ON CONFLICT(user_id,word_id,mode) DO UPDATE SET correct=correct+excluded.correct,wrong=wrong+excluded.wrong,streak=CASE WHEN excluded.correct=1 THEN streak+1 ELSE 0 END,missed=MAX(missed,excluded.missed)").bind(v.id,b.mode,Number(correct),Number(!correct),Number(correct),Number(!correct)))
       ];
       if(correct&&b.mode==='review')statements.push(env.DB.prepare("UPDATE progress SET missed=0 WHERE user_id='ian' AND word_id=?").bind(w.id));
       await env.DB.batch(statements);

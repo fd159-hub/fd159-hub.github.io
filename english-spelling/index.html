@@ -83,20 +83,22 @@ async function setStageAccess(li,m,allowed){if(m===null){for(const key of Object
 async function changeStageAccess(li,m,allowed){$('stageAccessFields').disabled=true;$('editLesson').disabled=true;$('stageAccessStatus').textContent='正在儲存…';try{const ok=await setStageAccess(li,m,allowed);$('stageAccessStatus').textContent=ok?'已儲存；學生重新登入或重新載入後套用。':'未能儲存，已還原畫面。'}finally{$('editLesson').disabled=false;drawStageAccess()}}
 
 const randomize=a=>{let arr=a.slice();for(let i=arr.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr};
+function listeningWords(){return lessons[lesson].words.flatMap(group=>{const bySound=new Map();for(const w of group.variants||[group]){const key=w.en.toLowerCase();if(!bySound.has(key))bySound.set(key,[]);bySound.get(key).push(w)}return [...bySound.values()].map(variants=>variants.length===1?variants[0]:{...variants[0],zh:variants.map(w=>w.zh).join('／'),listenVariants:variants,listenLabel:variants.map(w=>w.en).join(' / ')})})}
+function americanVoice(utterance){utterance.lang='en-US';const voice=speechSynthesis.getVoices().find(v=>v.lang.replaceAll('_','-').toLowerCase()==='en-us');if(voice)utterance.voice=voice;return utterance}
 const imageFor=w=>window.IAN_CLOUD_ACTIVE?w.image:WORD_IMAGES[w.en];
-const eligible=()=>{let a=words();return mode==='picture'?a.filter(w=>imageFor(w)):mode==='review'?(a.filter(w=>misses[key(w)]) .length?a.filter(w=>misses[key(w)]):a):a};
+const eligible=()=>{let a=words();return mode==='listen'?listeningWords():mode==='picture'?a.filter(w=>imageFor(w)):mode==='review'?(a.filter(w=>misses[key(w)]) .length?a.filter(w=>misses[key(w)]):a):a};
 const current=()=>queue[idx]||null;
 function makeQueue(){let last=current()?.en;queue=isUnlocked(mode)?randomize(eligible()):[];if(queue.length>1&&queue[0].en===last)queue.push(queue.shift());idx=0}
 function lock(v){document.querySelectorAll('.alphabetKey').forEach(b=>b.disabled=v||checked);document.querySelectorAll('.tile,.option').forEach(b=>{b.disabled=v||checked||(b.dataset.used==='yes')});$('check').disabled=v||checked;$('clear').disabled=v||checked}
-function speak(){const w=current();if(!w)return;const token=++voiceSeq;pending=true;lock(true);$('playline').textContent='🔊 請先聽發音…';let completed=false;function done(){if(completed||token!==voiceSeq)return;completed=true;pending=false;lock(false);$('playline').textContent='🎯 現在可以作答了！'}if(!window.speechSynthesis){done();$('playline').textContent='🔇 裝置不支援語音';return}try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(w.en);u.lang='en-US';u.rate=.76;u.onend=done;u.onerror=done;speechSynthesis.speak(u);setTimeout(done,3500)}catch(e){done()}}
+function speak(){const w=current();if(!w)return;const token=++voiceSeq;pending=true;lock(true);$('playline').textContent='🔊 請先聽發音…';let completed=false;function done(){if(completed||token!==voiceSeq)return;completed=true;pending=false;lock(false);$('playline').textContent='🎯 現在可以作答了！'}if(!window.speechSynthesis){done();$('playline').textContent='🔇 裝置不支援語音';return}try{speechSynthesis.cancel();const u=americanVoice(new SpeechSynthesisUtterance(w.listenVariants?w.en.toLowerCase():w.en));u.rate=.76;u.onend=done;u.onerror=done;speechSynthesis.speak(u);setTimeout(done,3500)}catch(e){done()}}
 function stateFor(w,m=mode){const s=stageKey(m)+'|'+w.en;return history[s]||{good:0,bad:0}}
-function countMastered(m=mode){const a=m==='picture'?words().filter(w=>imageFor(w)):words();return a.length?{good:a.filter(w=>stateFor(w,m).good>=2).length,total:a.length}:{good:0,total:0}}
+function countMastered(m=mode){const a=m==='listen'?listeningWords():m==='picture'?words().filter(w=>imageFor(w)):words();return a.length?{good:a.filter(w=>(w.listenVariants||[w]).some(v=>stateFor(v,m).good>=2)).length,total:a.length}:{good:0,total:0}}
 let newlyUnlocked=null,transitionTimer=null,transitionBusy=false;let keyboardUpper=false;
 function evaluateUnlock(){const i=STAGES.indexOf(mode);if(i>=5)return;let c=countMastered(mode);if(c.total&&c.good===c.total&&Number(stageUnlock[lesson]||0)<=i){stageUnlock[lesson]=i+1;save('ian-unlock-v3',stageUnlock);newlyUnlocked=isUnlocked(STAGES[i+1])?STAGES[i+1]:null}}
-function record(ok){const w=current();const id=stageKey()+'|'+w.en;const s=history[id]||{good:0,bad:0};if(ok){s.good++;if(mode==='review')delete misses[key(w)]}else{s.bad++;s.good=0;misses[key(w)]=true}history[id]=s;save('ian-progress-v3',history);save('ian-misses-v3',misses);if(ok)evaluateUnlock()}
+function record(ok){const w=current();for(const target of mode==='listen'?(w.listenVariants||[w]):[w]){const id=stageKey()+'|'+target.en;const s=history[id]||{good:0,bad:0};if(ok){s.good++;if(mode==='review')delete misses[key(target)]}else{s.bad++;s.good=0;misses[key(target)]=true}history[id]=s}save('ian-progress-v3',history);save('ian-misses-v3',misses);if(ok)evaluateUnlock()}
 function progressText(){let c=countMastered();return '熟練 '+c.good+' / '+c.total+'（每字連續答對 2 次）'}
 function showModeButtons(){document.querySelectorAll('[data-mode]').forEach(b=>{let m=b.dataset.mode,locked=!isUnlocked(m);b.classList.toggle('active',m===mode);b.disabled=locked;b.title=locked?'先通過上一關所有單字：各連續答對兩次':'';b.style.opacity=locked?'.42':'1'})}
-function generateOptions(target){const all=words().filter(w=>w.en!==target.en);const options=randomize([target.en,...randomize(all).slice(0,3).map(w=>w.en)]);$('answers').replaceChildren();options.forEach(v=>{let b=document.createElement('button');b.className='option';b.textContent=v;b.onclick=()=>{if(pending||checked)return;selected=[v];check()};$('answers').append(b)})}
+function generateOptions(target){const all=listeningWords().filter(w=>w.en!==target.en);const options=randomize([target,...randomize(all).slice(0,3)]);$('answers').replaceChildren();options.forEach(v=>{let b=document.createElement('button');b.className='option';b.textContent=v.listenLabel||v.en;b.onclick=()=>{if(pending||checked)return;selected=[v.en];check()};$('answers').append(b)})}
 function slots(t,display=[]){$('slots').replaceChildren();[...t].forEach((l,i)=>{const s=document.createElement('div');s.className='slot';s.textContent=display[i]||'';$('slots').append(s)})}
 function shuffleDifferent(a){const original=a.join('');if(new Set(a).size<2)return a.slice();for(let i=0;i<30;i++){const candidate=randomize(a);if(candidate.join('')!==original)return candidate}const first=a.findIndex(ch=>ch!==a[0]);const rotated=a.slice(first).concat(a.slice(0,first));return rotated.join('')===original?a.slice().reverse():rotated}
 function missingPositions(word,count){const chars=[...word],positions=chars.map((_,i)=>i);let result=[];for(let i=0;i<50;i++){const p=randomize(positions).slice(0,count).sort((a,b)=>a-b);result=p;if(new Set(p.map(index=>chars[index])).size>1)break}if(new Set(result.map(i=>chars[i])).size<2&&new Set(chars).size>1){const a=positions.find(i=>chars[i]!==chars[0]);result=[0,a,...positions.filter(i=>i!==0&&i!==a)].slice(0,count).sort((x,y)=>x-y)}return result}
@@ -105,8 +107,8 @@ const LETTER_NAMES={a:'ay',b:'bee',c:'see',d:'dee',e:'ee',f:'eff',g:'jee',h:'ait
 function speakLetter(letter){
  if(!('speechSynthesis' in window))return;
  const name=LETTER_NAMES[letter.toLowerCase()];if(!name)return;
- try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(name);u.lang='en-US';u.rate=.85;u.pitch=1;
- const voices=speechSynthesis.getVoices();const english=voices.find(v=>v.lang.toLowerCase()==='en-us')||voices.find(v=>v.lang.toLowerCase().startsWith('en'));if(english)u.voice=english;
+ try{speechSynthesis.cancel();const u=americanVoice(new SpeechSynthesisUtterance(name));u.rate=.85;u.pitch=1;
+
  speechSynthesis.speak(u)}catch(e){}
 }
 function drawAlphabetKeyboard(){
@@ -164,7 +166,7 @@ function announceResult(ok,w){
 }
 function check(){let w=current();if(!w||checked||pending||transitionBusy)return;
 let ans=mode==='dictation'||mode==='review'?$('entry').value.trim():mode==='missing'?(()=>{let letters=[...w.en];hiddenPositions.forEach((position,i)=>{letters[position]=selected[i]||''});return letters.join('')})():selected.join('');
-const ok=ans===w.en;checked=true;attempts[stageKey()]=(attempts[stageKey()]||0)+1;save('ian-attempts-v3',attempts);record(ok);$('feedback').textContent='';$('next').disabled=true;lock(true);showModeButtons();announceResult(ok,w)}
+const ok=mode==='listen'?(w.listenVariants||[w]).some(v=>v.en===ans):ans===w.en;checked=true;attempts[stageKey()]=(attempts[stageKey()]||0)+1;save('ian-attempts-v3',attempts);record(ok);$('feedback').textContent='';$('next').disabled=true;lock(true);showModeButtons();announceResult(ok,w)}
 function next(){if(!checked||transitionBusy)return;if(idx<queue.length-1){idx++}else{makeQueue()}render()}
 function pickMode(m){if(transitionBusy||!isUnlocked(m))return;mode=m;makeQueue();render()}
 function editLessonSelect(){let el=$('editLesson');el.innerHTML='';lessons.forEach((l,i)=>{let op=document.createElement('option');op.value=i;op.textContent=l.title;el.append(op)});drawAdminList()}

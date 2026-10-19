@@ -58,6 +58,26 @@ test('health queries schema; missing configuration fails closed',async()=>{
  assert.equal((await request({...env,SESSION_SECRET:'short'},'/api/health')).status,503);
  const bare=database(':memory:',false);assert.equal((await request(environment(bare),'/api/health')).status,500);
 });
+
+test('listening combines same-group case variants without weakening spelling or replay',async()=>{
+ const env=environment(),token=await login(env),admin=await login(env,'admin');
+ const variants=env.DB.sqlite.prepare("SELECT * FROM words WHERE spelling IN ('Miss','miss') ORDER BY id").all();
+ const [upper,lower]=variants;
+ const id=crypto.randomUUID();assert.equal((await answer(env,token,upper.id,'listen','miss',id)).body.correct,true);
+ await answer(env,token,upper.id,'listen','miss',id);
+ assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) n FROM attempts').get().n,1);
+ for(const w of variants)assert.equal(env.DB.sqlite.prepare("SELECT streak FROM progress WHERE word_id=? AND mode='listen'").get(w.id).streak,1);
+ await answer(env,token,upper.id,'listen','Miss');
+ for(const w of variants)assert.equal(env.DB.sqlite.prepare("SELECT streak FROM progress WHERE word_id=? AND mode='listen'").get(w.id).streak,2);
+ // Finishing seven other sound groups unlocks lesson 2 without a duplicate Miss question.
+ for(const w of env.DB.sqlite.prepare('SELECT * FROM words WHERE lesson_id=2 AND group_no!=8').all())for(let i=0;i<2;i++)await answer(env,token,w.id,'listen',w.spelling);
+ assert.equal(env.DB.sqlite.prepare('SELECT stage FROM unlocks WHERE lesson_id=2').get().stage,1);
+ assert.equal((await answer(env,token,upper.id,'tiles','miss')).body.correct,false);
+ await request(env,'/api/admin/words',{lessonId:2,groupNo:9,spelling:'MISS',meaning:'separate group'},admin);
+ assert.equal((await answer(env,token,upper.id,'listen','MISS')).body.correct,false);
+ for(const w of variants)assert.equal(env.DB.sqlite.prepare("SELECT streak FROM progress WHERE word_id=? AND mode='listen'").get(w.id).streak,0);
+ assert.equal((await answer(env,token,lower.id,'listen','Miss')).body.correct,true);
+});
 test('authentication, malformed/forged/expired tokens, roles and CORS',async()=>{
  const env=environment(),student=await login(env),admin=await login(env,'admin');
  assert.equal((await request(env,'/api/state')).status,401);
@@ -102,7 +122,7 @@ test('all stages, third-lesson images and empty picture skip',async()=>{
 test('admin CRUD, invalid inputs, cleanup and isolated lesson reset',async()=>{
  const env=environment(),s=await login(env),a=await login(env,'admin');
  const original=env.DB.sqlite.prepare('SELECT COUNT(*) n FROM words').get().n;
- await answer(env,s,1,'listen','one');const second=env.DB.sqlite.prepare('SELECT * FROM words WHERE lesson_id=2 LIMIT 1').get();await answer(env,s,second.id,'listen',second.spelling);
+ await answer(env,s,1,'listen','one');const second=env.DB.sqlite.prepare('SELECT * FROM words WHERE lesson_id=2 ORDER BY id LIMIT 1').get();await answer(env,s,second.id,'listen',second.spelling);
  assert.equal((await request(env,'/api/admin/reset',{lessonId:1},a)).status,200);assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) n FROM progress').get().n,1);assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) n FROM words').get().n,original);
  assert.equal((await request(env,'/api/admin/reset',{lessonId:99},a)).status,404);
  assert.equal((await request(env,'/api/admin/lessons',{title:'新課'},a)).status,200);

@@ -20,7 +20,10 @@ try{
  browser=await chromium.launch({headless:true,...(process.env.IAN_BROWSER_EXECUTABLE?{executablePath:process.env.IAN_BROWSER_EXECUTABLE,args:['--no-sandbox','--disable-gpu','--disable-dev-shm-usage']}:{})});
  const context=await browser.newContext({viewport:{width:1366,height:900}});
  await context.addInitScript(()=>{
-  window.__utterances=[];speechSynthesis.speak=u=>{window.__utterances.push(u.text);queueMicrotask(()=>u.onend?.())};speechSynthesis.cancel=()=>{};
+  window.__utterances=[];window.__speechMetadata=[];window.__voiceFixtures=[{lang:'en-GB',name:'British'},{lang:'en-US',name:'American'}];
+  window.SpeechSynthesisUtterance=class{constructor(text){this.text=text;this.voice=null}};
+  speechSynthesis.getVoices=()=>window.__voiceFixtures;
+  speechSynthesis.speak=u=>{window.__utterances.push(u.text);window.__speechMetadata.push({text:u.text,lang:u.lang,voice:u.voice?.name||null});queueMicrotask(()=>u.onend?.())};speechSynthesis.cancel=()=>{};
   if(!localStorage.getItem('ian-lessons-v3'))localStorage.setItem('ian-local-preserved','sentinel');
  });
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
@@ -30,6 +33,8 @@ try{
  await page.waitForFunction(()=>document.querySelectorAll('.alphabetKey').length===28&&!document.querySelector('.alphabetKey').disabled);
  await page.locator('.alphabetKey').first().click();assert.equal(await page.locator('#entry').inputValue(),'a');
  assert.equal(await page.evaluate(()=>window.__utterances.at(-1)),'ay');
+ assert.deepEqual(await page.evaluate(()=>window.__speechMetadata.at(-1)),{text:'ay',lang:'en-US',voice:'American'});
+ assert.deepEqual(await page.evaluate(()=>{const old=__voiceFixtures;__voiceFixtures=[old[0]];const u=americanVoice(new SpeechSynthesisUtterance('test'));__voiceFixtures=old;return {lang:u.lang,voice:u.voice}}),{lang:'en-US',voice:null});
  await page.locator('.utilityKey').first().click();await page.locator('.alphabetKey').first().click();assert.equal(await page.locator('#entry').inputValue(),'aA');
  await page.locator('.utilityKey').last().click();assert.equal(await page.locator('#entry').inputValue(),'a');groups++;
  // Local independent switches and the all-closed learner state.
@@ -42,6 +47,15 @@ try{
  await page.evaluate(()=>admin());await page.locator('#restoreAutoUnlock').click();
  assert.equal(await page.locator('[data-stage="dictation"]').isChecked(),true);
  assert.equal(await page.evaluate(()=>stageUnlock[0]),4);groups++;
+ await page.evaluate(()=>{learner();$('gate').classList.add('hidden');lesson=1;mode='listen';makeQueue();idx=queue.findIndex(w=>w.listenVariants);render()});
+ await page.waitForFunction(()=>!pending&&window.__speechMetadata.at(-1)?.text==='miss');
+ assert.equal(await page.evaluate(()=>queue.length),8);assert.equal(await page.evaluate(()=>countMastered('listen').total),8);
+ assert.equal(await page.locator('.option').filter({hasText:/^Miss \/ miss$/}).count(),1);
+ assert(!(await page.locator('.option').allTextContents()).some(x=>x==='Miss'||x==='miss'));
+ assert.deepEqual(await page.evaluate(()=>window.__speechMetadata.at(-1)),{text:'miss',lang:'en-US',voice:'American'});
+ await page.getByRole('button',{name:'Miss / miss',exact:true}).click();
+ assert.equal(await page.evaluate(()=>history['1|listen|Miss'].good),1);assert.equal(await page.evaluate(()=>history['1|listen|miss'].good),1);
+ await page.evaluate(()=>{clearTimeout(transitionTimer);removeResult();lesson=0;mode='dictation';admin()});groups++;
  const before=await page.evaluate(()=>JSON.stringify({...localStorage}));
  await page.goto('http://localhost:4173/english-spelling/?cloud=http://localhost:8787');
  await page.locator('#ianLogin').click();await page.locator('#authPassword').fill('test-student-pin');await page.locator('#authSubmit').click();await page.locator('#start').click();
@@ -82,6 +96,14 @@ try{
  await page.locator('#restoreAutoUnlock').click();await settled();
  assert.equal((await db.prepare('SELECT COUNT(*) n FROM stage_access').first()).n,0);
  assert.equal(await page.locator('[data-stage="listen"]').isChecked(),true);assert.equal(await page.locator('[data-stage="dictation"]').isChecked(),false);
- assert.equal(await page.evaluate(()=>JSON.stringify({...localStorage})),before);await accessContext.close();groups++;
+ assert.equal(await page.evaluate(()=>JSON.stringify({...localStorage})),before);groups++;
+ // Same single option reaches the real workerd API and records only one attempt.
+ await accessPage.reload();await accessPage.locator('#ianLogin').click();await accessPage.locator('#authPassword').fill('test-student-pin');await accessPage.locator('#authSubmit').click();await accessPage.waitForFunction(()=>document.querySelector('#authGate').hidden);await accessPage.locator('#start').click();await accessPage.locator('[data-mode="listen"]').click();
+ await accessPage.waitForFunction(()=>!pending&&!document.querySelector('.option').disabled);
+ assert.equal(await accessPage.locator('.option').count(),1);assert.equal(await accessPage.locator('.option').textContent(),'Miss / miss');
+ await accessPage.locator('.option').click();await accessPage.waitForFunction(()=>checked===true);
+ assert.equal((await db.prepare('SELECT COUNT(*) n FROM attempts').first()).n,1);
+ assert.equal((await db.prepare("SELECT streak FROM progress p JOIN words w ON w.id=p.word_id WHERE spelling='miss' AND mode='listen'").first()).streak,1);
+ await accessContext.close();groups++;
  assert.deepEqual(errors,[]);console.log('PASS: '+groups+' browser integration groups; no page errors; localStorage unchanged in cloud mode');
 }finally{await browser?.close();await new Promise(r=>staticServer.close(r));await new Promise(r=>apiServer.close(r));await mf.dispose()}
