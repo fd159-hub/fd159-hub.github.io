@@ -1,7 +1,8 @@
 export const MODES = ['listen','tiles','missing','picture','dictation','review'];
-export const IMAGES = {one:'1️⃣',two:'2️⃣',three:'3️⃣',red:'🔴',blue:'🔵',green:'🟢',pink:'🩷',purple:'🟣',pen:'🖊️',pencil:'✏️',book:'📖',cap:'🧢',teacher:'👩‍🏫',class:'🏫',English:'🔤'};
+export const IMAGES = {'pencil case':'👝',one:'1️⃣',two:'2️⃣',three:'3️⃣',red:'🔴',blue:'🔵',green:'🟢',pink:'🩷',purple:'🟣',pen:'🖊️',pencil:'✏️',book:'📖',cap:'🧢',teacher:'👩‍🏫',class:'🏫',English:'🔤'};
 const count = x => Number.isSafeInteger(x) && x >= 0 && x <= 10000000;
-const validWord = w => w && typeof w.en==='string' && /^[A-Za-z]+(?:[-'][A-Za-z]+)*$/.test(w.en) && w.en.length<=100 && typeof w.zh==='string' && w.zh.trim().length>0 && w.zh.length<=120;
+export const normalizeSpelling = value => typeof value==='string'?value.trim().replace(/\s+/g,' '):'';
+const validWord = w => w && typeof w.en==='string' && /^[A-Za-z]+(?:[-' ][A-Za-z]+)*$/.test(w.en) && w.en.length<=100 && typeof w.zh==='string' && w.zh.trim().length>0 && w.zh.length<=120;
 export function normalizeBackup(b) {
   if (!b || b.version!==3 || !Array.isArray(b.lessons) || !b.lessons.length || b.lessons.length>100) throw Error('備份格式或版本無效');
   const lessons=[],words=[],progress=[],unlocks=[],stageAccess=[];

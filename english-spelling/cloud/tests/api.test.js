@@ -59,6 +59,25 @@ test('health queries schema; missing configuration fails closed',async()=>{
  const bare=database(':memory:',false);assert.equal((await request(environment(bare),'/api/health')).status,500);
 });
 
+test('phrases save, normalize whitespace, work in every mode and survive backup import',async()=>{
+ const env=environment(),admin=await login(env,'admin'),student=await login(env);
+ await request(env,'/api/admin/lessons',{title:'片語測試課'},admin);
+ const phrase={lessonId:4,groupNo:1,spelling:'  pencil \t case  ',meaning:'鉛筆盒',image:'👝'};
+ assert.equal((await request(env,'/api/admin/words',phrase,admin)).status,200);
+ const word=env.DB.sqlite.prepare("SELECT * FROM words WHERE lesson_id=4").get();assert.equal(word.spelling,'pencil case');
+ assert.equal((await request(env,'/api/admin/words',{...phrase,spelling:'pencil case'},admin)).status,409);
+ assert.equal((await request(env,'/api/admin/words',{...phrase,spelling:'pencil <case>'},admin)).status,400);
+ for(const mode of ['listen','tiles','missing','picture','dictation'])for(let i=0;i<2;i++)assert.equal((await answer(env,student,word.id,mode,'pencil case')).body.correct,true);
+ assert.equal(env.DB.sqlite.prepare('SELECT stage FROM unlocks WHERE lesson_id=4').get().stage,5);
+ assert.equal((await answer(env,student,word.id,'dictation','pencilcase')).body.correct,false);
+ assert.equal((await answer(env,student,word.id,'review',' pencil   case ')).body.correct,true);
+ const backup=(await request(env,'/api/admin/export',undefined,admin)).body;
+ assert.equal(normalizeBackup(backup).words.find(w=>w.lesson_id===4).spelling,'pencil case');
+ const fresh=environment(),token=await login(fresh,'admin');
+ assert.equal((await request(fresh,'/api/admin/import',{backup,confirm:'IMPORT_BACKUP'},token)).status,200);
+ assert.equal(fresh.DB.sqlite.prepare("SELECT spelling FROM words WHERE lesson_id=4").get().spelling,'pencil case');
+});
+
 test('listening combines same-group case variants without weakening spelling or replay',async()=>{
  const env=environment(),token=await login(env),admin=await login(env,'admin');
  const variants=env.DB.sqlite.prepare("SELECT * FROM words WHERE spelling IN ('Miss','miss') ORDER BY id").all();

@@ -1,4 +1,4 @@
-import {MODES, normalizeBackup, legacyState} from './backup.js';
+import {MODES, normalizeBackup, legacyState, normalizeSpelling} from './backup.js';
 const enc=new TextEncoder();
 const json=(v,status=200)=>new Response(JSON.stringify(v),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 class ApiError extends Error { constructor(message,status=400){super(message);this.status=status} }
@@ -62,6 +62,7 @@ async function login(req,env){
 async function attempt(req,env){
   const b=await bodyJson(req);
   requireValue(integer(b.wordId)&&MODES.includes(b.mode)&&typeof b.answer==='string'&&b.answer.length<=100,'作答格式錯誤');
+  b.answer=normalizeSpelling(b.answer);
   requireValue(typeof b.requestId==='string'&&/^[a-zA-Z0-9_-]{16,80}$/.test(b.requestId),'需要有效 requestId');
   const w=await env.DB.prepare('SELECT * FROM words WHERE id=?').bind(b.wordId).first();requireValue(w,'無此單字',404);
   const stage=await updateUnlock(env,w.lesson_id);
@@ -124,8 +125,8 @@ async function admin(req,env,path){
   if(path==='/api/admin/export'&&req.method==='GET')return json(legacyState(await state(env)));
   if(path==='/api/admin/import'&&req.method==='POST')return importBackup(req,env);
   if(path==='/api/admin/words'&&req.method==='POST'){
-    const b=await bodyJson(req),spelling=typeof b.spelling==='string'?b.spelling.trim():'',meaning=typeof b.meaning==='string'?b.meaning.trim():'';
-    requireValue(integer(b.lessonId)&&integer(b.groupNo)&&/^[A-Za-z]+(?:[-'][A-Za-z]+)*$/.test(spelling)&&spelling.length<=100&&meaning&&meaning.length<=120&&(b.image==null||(typeof b.image==='string'&&b.image.length<=500)),'欄位無效');
+    const b=await bodyJson(req),spelling=normalizeSpelling(b.spelling),meaning=typeof b.meaning==='string'?b.meaning.trim():'';
+    requireValue(integer(b.lessonId)&&integer(b.groupNo)&&/^[A-Za-z]+(?:[-' ][A-Za-z]+)*$/.test(spelling)&&spelling.length<=100&&meaning&&meaning.length<=120&&(b.image==null||(typeof b.image==='string'&&b.image.length<=500)),'欄位無效');
     requireValue(await env.DB.prepare('SELECT id FROM lessons WHERE id=?').bind(b.lessonId).first(),'無此課次',404);
     if(b.id!=null){requireValue(integer(b.id),'單字 id 無效');requireValue(await env.DB.prepare('SELECT id FROM words WHERE id=?').bind(b.id).first(),'無此單字',404)}
     const duplicate=await env.DB.prepare('SELECT id FROM words WHERE lesson_id=? AND spelling=? AND id!=?').bind(b.lessonId,spelling,b.id??-1).first();requireValue(!duplicate,'同課已有相同拼字',409);

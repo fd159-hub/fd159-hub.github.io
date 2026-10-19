@@ -30,7 +30,7 @@ try{
  await page.goto('http://localhost:4173/english-spelling/');
  await page.evaluate(()=>localStorage.setItem('ian-unlock-v3',JSON.stringify({0:4})));
  await page.reload();await page.locator('#ianLogin').click();await page.locator('#start').click();
- await page.waitForFunction(()=>document.querySelectorAll('.alphabetKey').length===28&&!document.querySelector('.alphabetKey').disabled);
+ await page.waitForFunction(()=>document.querySelectorAll('.alphabetKey').length===31&&!document.querySelector('.alphabetKey').disabled);
  await page.locator('.alphabetKey').first().click();assert.equal(await page.locator('#entry').inputValue(),'a');
  assert.equal(await page.evaluate(()=>window.__utterances.at(-1)),'ay');
  assert.deepEqual(await page.evaluate(()=>window.__speechMetadata.at(-1)),{text:'ay',lang:'en-US',voice:'American'});
@@ -56,6 +56,24 @@ try{
  await page.getByRole('button',{name:'Miss / miss',exact:true}).click();
  assert.equal(await page.evaluate(()=>history['1|listen|Miss'].good),1);assert.equal(await page.evaluate(()=>history['1|listen|miss'].good),1);
  await page.evaluate(()=>{clearTimeout(transitionTimer);removeResult();lesson=0;mode='dictation';admin()});groups++;
+ // Save a real phrase via the local manager, then exercise all six stages.
+ await page.locator('#editEnglish').fill('  pencil   case  ');await page.locator('#editChinese').fill('鉛筆盒');await page.locator('#saveWord').click();
+ assert.equal(await page.evaluate(()=>lessons[0].words.at(-1).en),'pencil case');
+ const chooseTile=async character=>{if(character===' ')await page.getByRole('button',{name:'空格',exact:true}).click();else await page.locator('.tile:not(:disabled)').filter({hasText:new RegExp('^'+character+'$')}).first().click()};
+ for(const m of ['listen','tiles','missing','picture','dictation','review']){
+   await page.evaluate(m=>{clearTimeout(transitionTimer);removeResult();transitionBusy=false;lesson=0;mode=m;stageAccess['0|'+m]=true;makeQueue();idx=queue.findIndex(w=>w.en==='pencil case');screen='learner';$('adminScreen').hidden=true;render()},m);
+   await page.waitForFunction(()=>!pending&&document.querySelector('#playline').textContent.includes('現在可以作答'));
+   if(m==='listen')await page.getByRole('button',{name:'pencil case',exact:true}).click();
+   else{
+     if(m==='tiles'||m==='picture'){assert.equal(await page.getByRole('button',{name:'空格',exact:true}).count(),1);for(const c of 'pencil case')await chooseTile(c)}
+     if(m==='missing'){assert(await page.evaluate(()=>hiddenPositions.every(i=>/[A-Za-z]/.test(current().en[i]))));assert.equal(await page.locator('.spaceSlot').textContent(),'␣');for(const c of await page.evaluate(()=>hiddenPositions.map(i=>current().en[i])))await chooseTile(c)}
+     if(m==='dictation'){for(const c of 'pencil case')await page.getByRole('button',{name:c===' '?'輸入空格':'輸入 '+c,exact:true}).click();assert.equal(await page.locator('#entry').inputValue(),'pencil case')}
+     if(m==='review')await page.locator('#entry').fill('pencil case');
+     await page.locator('#check').click();
+   }
+   assert.equal(await page.evaluate(m=>history['0|'+m+'|pencil case'].good,m),1);
+ }
+ await page.evaluate(()=>{clearTimeout(transitionTimer);removeResult();transitionBusy=false;admin()});groups++;
  const before=await page.evaluate(()=>JSON.stringify({...localStorage}));
  await page.goto('http://localhost:4173/english-spelling/?cloud=http://localhost:8787');
  await page.locator('#ianLogin').click();await page.locator('#authPassword').fill('test-student-pin');await page.locator('#authSubmit').click();await page.locator('#start').click();
@@ -105,5 +123,13 @@ try{
  assert.equal((await db.prepare('SELECT COUNT(*) n FROM attempts').first()).n,1);
  assert.equal((await db.prepare("SELECT streak FROM progress p JOIN words w ON w.id=p.word_id WHERE spelling='miss' AND mode='listen'").first()).streak,1);
  await accessContext.close();groups++;
+ // Manager saves and edits a spaced phrase against the real local workerd API.
+ await page.locator('#editEnglish').fill(' pencil   case ');await page.locator('#editChinese').fill('鉛筆盒');await page.locator('#saveWord').click();
+ await page.waitForFunction(()=>lessons[0].words.some(w=>w.en==='pencil case'));
+ const phrase=await db.prepare("SELECT * FROM words WHERE spelling='pencil case'").first();assert(phrase);assert.equal(phrase.image,'👝');
+ const phraseRow=page.locator('.adminRow').filter({has:page.locator('b',{hasText:'pencil case'})});
+ await phraseRow.getByRole('button',{name:'✏️ 修改',exact:true}).click();await page.locator('#editChinese').fill('鉛筆盒（片語）');await page.locator('#saveWord').click();
+ await page.waitForFunction(()=>lessons[0].words.some(w=>w.en==='pencil case'&&w.zh==='鉛筆盒（片語）'));
+ assert.equal((await db.prepare('SELECT meaning FROM words WHERE id=?').bind(phrase.id).first()).meaning,'鉛筆盒（片語）');groups++;
  assert.deepEqual(errors,[]);console.log('PASS: '+groups+' browser integration groups; no page errors; localStorage unchanged in cloud mode');
 }finally{await browser?.close();await new Promise(r=>staticServer.close(r));await new Promise(r=>apiServer.close(r));await mf.dispose()}

@@ -103,7 +103,7 @@
   };
   $('saveWord').onclick=async()=>{
     const li=editPosition?.li??Number($('editLesson').value),l=lessons[li],all=l.words.flatMap(g=>g.variants||[g]);
-    const ok=await mutate('/api/admin/words',{...(editPosition?{id:editPosition.id}:{}),lessonId:l.id,groupNo:editPosition?.groupNo??Math.max(0,...all.map(w=>w.groupNo))+1,spelling:$('editEnglish').value,meaning:$('editChinese').value,image:editPosition?.image??WORD_IMAGES[$('editEnglish').value.trim()]??null});
+    const ok=await mutate('/api/admin/words',{...(editPosition?{id:editPosition.id}:{}),lessonId:l.id,groupNo:editPosition?.groupNo??Math.max(0,...all.map(w=>w.groupNo))+1,spelling:normalizeSpelling($('editEnglish').value),meaning:$('editChinese').value,image:editPosition?.image??WORD_IMAGES[normalizeSpelling($('editEnglish').value)]??null});
     if(ok){$('editEnglish').value='';$('editChinese').value=''}
   };
   $('addLesson').onclick=()=>{const title=prompt('新課名稱');if(title)mutate('/api/admin/lessons',{title})};

@@ -48,7 +48,7 @@
 .alphabetKeyboard{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:clamp(4px,.7vw,9px);width:min(100%,1100px);margin:0 auto}
 .alphabetKey{min-width:0;min-height:clamp(48px,7vh,72px);padding:4px;background:#ffdf75;color:#5b400b;border-radius:11px;box-shadow:0 3px 0 #d9af42;font-size:clamp(23px,3vw,37px);font-weight:900}
 .alphabetKey.utilityKey{grid-column:span 2;background:#d9ccff;color:#58339b;box-shadow:0 3px 0 #ac95ec;font-size:clamp(13px,1.8vw,20px)}
-.alphabetKey:disabled{opacity:.5}.alphabetKey:focus-visible{outline:3px solid #4c7fe8;outline-offset:2px}
+.separatorKeys{grid-column:1/-1;display:flex;gap:8px}.separatorKeys .alphabetKey{min-width:60px;font-size:18px;padding:6px 12px}.separatorKeys .spaceKey{flex:1}.slot.spaceSlot{min-width:26px;background:#edf5ff;border-bottom-style:dashed;color:#42618a}.tile.spaceTile{font-size:16px;background:#d5eaff;color:#254f79}.option{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}.alphabetKey:disabled{opacity:.5}.alphabetKey:focus-visible{outline:3px solid #4c7fe8;outline-offset:2px}
 #entry[readonly]{caret-color:transparent;background:#fff;user-select:none}
 @media(max-width:750px){.alphabetKeyboard{grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}.alphabetKey{min-height:43px;border-radius:9px;font-size:clamp(18px,4.8vw,25px);padding:2px}.alphabetKey.utilityKey{grid-column:span 2;font-size:12px}}
 @media(max-height:650px){.alphabetKey{min-height:36px;font-size:20px}.alphabetKeyboard{gap:3px}}
@@ -65,7 +65,7 @@ const DEFAULT_LESSONS=[
 {title:'第 2 課',words:[{en:'two',zh:'二'},{en:'blue',zh:'藍色'},{en:'book',zh:'書'},{en:'green',zh:'綠色'},{en:'pink',zh:'粉紅色'},{en:'purple',zh:'紫色'},{en:'pencil',zh:'鉛筆'},{variants:[{en:'Miss',zh:'小姐（稱謂）'},{en:'miss',zh:'想念'}]}]},
 {title:'第 3 課',words:[{en:'three',zh:'三'},{en:'cap',zh:'棒球帽'},{en:'come',zh:'來'},{en:'his',zh:'他的'},{en:'please',zh:'請'},{en:'yes',zh:'是的'},{en:'this',zh:'這'},{en:'whose',zh:'誰的'}]}
 ];
-const WORD_IMAGES={one:'1️⃣',two:'2️⃣',three:'3️⃣',red:'🔴',blue:'🔵',green:'🟢',pink:'🩷',purple:'🟣',pen:'🖊️',pencil:'✏️',book:'📖',cap:'🧢',teacher:'👩‍🏫',class:'🏫',English:'🔤'};
+const WORD_IMAGES={'pencil case':'👝',one:'1️⃣',two:'2️⃣',three:'3️⃣',red:'🔴',blue:'🔵',green:'🟢',pink:'🩷',purple:'🟣',pen:'🖊️',pencil:'✏️',book:'📖',cap:'🧢',teacher:'👩‍🏫',class:'🏫',English:'🔤'};
 const MODE_NAMES={listen:['👂','聽音辨字'],tiles:['🧩','字母排列'],missing:['🔎','消失的字母'],picture:['🖼️','看圖拼字'],dictation:['✏️','終極默寫'],review:['💪','錯題複習']};
 const STAGES=['listen','tiles','missing','picture','dictation','review'];
 const $=id=>document.getElementById(id);
@@ -74,6 +74,7 @@ const load=(k,def)=>{try{return JSON.parse(localStorage.getItem(k))??def}catch(e
 let lessons=load('ian-lessons-v3',DEFAULT_LESSONS),history=load('ian-progress-v3',{}),misses=load('ian-misses-v3',{}),stageUnlock=load('ian-unlock-v3',{}),attempts=load('ian-attempts-v3',{}),stageAccess=load('ian-stage-access-v3',{}),lesson=0,mode='listen',idx=0,queue=[],selected=[],used=[],pending=false,checked=false,voiceSeq=0,points=0,tiles=[],hiddenPositions=[],wordError=false,selectedMode='listen',editPosition=null,screen='login',audioEnabled=false;
 const words=()=>lessons[lesson].words.flatMap(w=>w.variants||[w]);
 const key=w=>lesson+'|'+w.en;
+const normalizeSpelling=value=>typeof value==='string'?value.trim().replace(/\s+/g,' '):'';
 const stageKey=(m=mode,l=lesson)=>l+'|'+m;
 const isUnlocked=(m,li=lesson)=>Object.hasOwn(stageAccess,li+'|'+m)?stageAccess[li+'|'+m]===true:STAGES.indexOf(m)<=Number(stageUnlock[li]||0);
 function availableMode(){const preferred=STAGES[Math.min(5,Number(stageUnlock[lesson]||0))];return isUnlocked(preferred)?preferred:(STAGES.find(m=>isUnlocked(m))||'listen')}
@@ -85,7 +86,7 @@ async function changeStageAccess(li,m,allowed){$('stageAccessFields').disabled=t
 const randomize=a=>{let arr=a.slice();for(let i=arr.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr};
 function listeningWords(){return lessons[lesson].words.flatMap(group=>{const bySound=new Map();for(const w of group.variants||[group]){const key=w.en.toLowerCase();if(!bySound.has(key))bySound.set(key,[]);bySound.get(key).push(w)}return [...bySound.values()].map(variants=>variants.length===1?variants[0]:{...variants[0],zh:variants.map(w=>w.zh).join('／'),listenVariants:variants,listenLabel:variants.map(w=>w.en).join(' / ')})})}
 function americanVoice(utterance){utterance.lang='en-US';const voice=speechSynthesis.getVoices().find(v=>v.lang.replaceAll('_','-').toLowerCase()==='en-us');if(voice)utterance.voice=voice;return utterance}
-const imageFor=w=>window.IAN_CLOUD_ACTIVE?w.image:WORD_IMAGES[w.en];
+const imageFor=w=>window.IAN_CLOUD_ACTIVE?w.image:(Object.hasOwn(w,'image')?w.image:WORD_IMAGES[w.en]);
 const eligible=()=>{let a=words();return mode==='listen'?listeningWords():mode==='picture'?a.filter(w=>imageFor(w)):mode==='review'?(a.filter(w=>misses[key(w)]) .length?a.filter(w=>misses[key(w)]):a):a};
 const current=()=>queue[idx]||null;
 function makeQueue(){let last=current()?.en;queue=isUnlocked(mode)?randomize(eligible()):[];if(queue.length>1&&queue[0].en===last)queue.push(queue.shift());idx=0}
@@ -99,10 +100,10 @@ function record(ok){const w=current();for(const target of mode==='listen'?(w.lis
 function progressText(){let c=countMastered();return '熟練 '+c.good+' / '+c.total+'（每字連續答對 2 次）'}
 function showModeButtons(){document.querySelectorAll('[data-mode]').forEach(b=>{let m=b.dataset.mode,locked=!isUnlocked(m);b.classList.toggle('active',m===mode);b.disabled=locked;b.title=locked?'先通過上一關所有單字：各連續答對兩次':'';b.style.opacity=locked?'.42':'1'})}
 function generateOptions(target){const all=listeningWords().filter(w=>w.en!==target.en);const options=randomize([target,...randomize(all).slice(0,3)]);$('answers').replaceChildren();options.forEach(v=>{let b=document.createElement('button');b.className='option';b.textContent=v.listenLabel||v.en;b.onclick=()=>{if(pending||checked)return;selected=[v.en];check()};$('answers').append(b)})}
-function slots(t,display=[]){$('slots').replaceChildren();[...t].forEach((l,i)=>{const s=document.createElement('div');s.className='slot';s.textContent=display[i]||'';$('slots').append(s)})}
+function slots(t,display=[]){$('slots').replaceChildren();[...t].forEach((l,i)=>{const s=document.createElement('div');s.className='slot';s.textContent=display[i]===' '?'␣':(display[i]||'');if(l===' '){s.classList.add('spaceSlot');s.setAttribute('aria-label','空格位置');if(!display[i])s.textContent='·'}$('slots').append(s)})}
 function shuffleDifferent(a){const original=a.join('');if(new Set(a).size<2)return a.slice();for(let i=0;i<30;i++){const candidate=randomize(a);if(candidate.join('')!==original)return candidate}const first=a.findIndex(ch=>ch!==a[0]);const rotated=a.slice(first).concat(a.slice(0,first));return rotated.join('')===original?a.slice().reverse():rotated}
-function missingPositions(word,count){const chars=[...word],positions=chars.map((_,i)=>i);let result=[];for(let i=0;i<50;i++){const p=randomize(positions).slice(0,count).sort((a,b)=>a-b);result=p;if(new Set(p.map(index=>chars[index])).size>1)break}if(new Set(result.map(i=>chars[i])).size<2&&new Set(chars).size>1){const a=positions.find(i=>chars[i]!==chars[0]);result=[0,a,...positions.filter(i=>i!==0&&i!==a)].slice(0,count).sort((x,y)=>x-y)}return result}
-function letterButtons(a,callback,forceDifferent=false){$('tiles').replaceChildren();const arranged=forceDifferent?shuffleDifferent(a):randomize(a);tiles=arranged.map((ch,i)=>({ch,i}));tiles.forEach((x,i)=>{let b=document.createElement('button');b.className='tile';b.textContent=x.ch;b.onclick=()=>{if(pending||checked||used.includes(i))return;used.push(i);selected.push(x.ch);b.dataset.used='yes';b.disabled=true;callback()};$('tiles').append(b)})}
+function missingPositions(word,count){const chars=[...word],positions=chars.map((c,i)=>/[A-Za-z]/.test(c)?i:-1).filter(i=>i>=0);count=Math.min(Math.max(1,count),positions.length);let result=randomize(positions).slice(0,count);if(count>=2&&new Set(result.map(i=>chars[i])).size<2){const different=positions.find(i=>chars[i]!==chars[result[0]]);if(different!==undefined)result[1]=different}return result.sort((a,b)=>a-b)}
+function letterButtons(a,callback,forceDifferent=false){$('tiles').replaceChildren();const arranged=forceDifferent?shuffleDifferent(a):randomize(a);tiles=arranged.map((ch,i)=>({ch,i}));tiles.forEach((x,i)=>{let b=document.createElement('button');b.className='tile';b.textContent=x.ch===' '?'␣ 空格':x.ch;if(x.ch===' '){b.classList.add('spaceTile');b.setAttribute('aria-label','空格')}b.onclick=()=>{if(pending||checked||used.includes(i))return;used.push(i);selected.push(x.ch);b.dataset.used='yes';b.disabled=true;callback()};$('tiles').append(b)})}
 const LETTER_NAMES={a:'ay',b:'bee',c:'see',d:'dee',e:'ee',f:'eff',g:'jee',h:'aitch',i:'eye',j:'jay',k:'kay',l:'ell',m:'em',n:'en',o:'oh',p:'pee',q:'cue',r:'ar',s:'ess',t:'tee',u:'you',v:'vee',w:'double you',x:'ex',y:'why',z:'zee'};
 function speakLetter(letter){
  if(!('speechSynthesis' in window))return;
@@ -123,7 +124,10 @@ function drawAlphabetKeyboard(){
  shift.setAttribute('aria-label','切換大小寫');shift.onclick=()=>{if(pending||checked||transitionBusy)return;keyboardUpper=!keyboardUpper;drawAlphabetKeyboard()};
  const back=document.createElement('button');back.type='button';back.className='alphabetKey utilityKey';back.textContent='⌫ 倒退';back.setAttribute('aria-label','刪除最後一個字母');
  back.onclick=()=>{if(pending||checked||transitionBusy)return;$('entry').value=$('entry').value.slice(0,-1)};
- kb.append(shift,back);lock(pending);
+ kb.append(shift,back);
+ const separators=document.createElement('div');separators.className='separatorKeys';
+ for(const [character,label] of [[' ','␣ 空格'],["'","' 撇號"],['-','- 連字號']]){const b=document.createElement('button');b.type='button';b.className='alphabetKey'+(character===' '?' spaceKey':'');b.textContent=label;b.setAttribute('aria-label',character===' '?'輸入空格':character==="'"?'輸入撇號':'輸入連字號');b.onclick=()=>{if(pending||checked||transitionBusy)return;$('entry').value+=character};separators.append(b)}
+ kb.append(separators);lock(pending);
 }
 function render(){clearTimeout(transitionTimer);transitionBusy=false;voiceSeq++;if(window.speechSynthesis)speechSynthesis.cancel();pending=false;checked=false;selected=[];used=[];wordError=false;
 for(const id of ['cue','slots','tiles','answers','feedback'])$(id).replaceChildren();$('alphabetKeyboard').classList.add('hidden');$('entry').readOnly=false;$('cue').classList.remove('emoji');$('entry').classList.add('hidden');$('entry').value='';$('feedback').className='feedback';$('next').disabled=true;$('check').classList.remove('hidden');$('clear').classList.toggle('hidden',mode==='listen');$('check').classList.toggle('hidden',mode==='listen');
@@ -166,7 +170,7 @@ function announceResult(ok,w){
 }
 function check(){let w=current();if(!w||checked||pending||transitionBusy)return;
 let ans=mode==='dictation'||mode==='review'?$('entry').value.trim():mode==='missing'?(()=>{let letters=[...w.en];hiddenPositions.forEach((position,i)=>{letters[position]=selected[i]||''});return letters.join('')})():selected.join('');
-const ok=mode==='listen'?(w.listenVariants||[w]).some(v=>v.en===ans):ans===w.en;checked=true;attempts[stageKey()]=(attempts[stageKey()]||0)+1;save('ian-attempts-v3',attempts);record(ok);$('feedback').textContent='';$('next').disabled=true;lock(true);showModeButtons();announceResult(ok,w)}
+ans=normalizeSpelling(ans);const ok=mode==='listen'?(w.listenVariants||[w]).some(v=>v.en===ans):ans===w.en;checked=true;attempts[stageKey()]=(attempts[stageKey()]||0)+1;save('ian-attempts-v3',attempts);record(ok);$('feedback').textContent='';$('next').disabled=true;lock(true);showModeButtons();announceResult(ok,w)}
 function next(){if(!checked||transitionBusy)return;if(idx<queue.length-1){idx++}else{makeQueue()}render()}
 function pickMode(m){if(transitionBusy||!isUnlocked(m))return;mode=m;makeQueue();render()}
 function editLessonSelect(){let el=$('editLesson');el.innerHTML='';lessons.forEach((l,i)=>{let op=document.createElement('option');op.value=i;op.textContent=l.title;el.append(op)});drawAdminList()}
@@ -190,7 +194,7 @@ save('ian-progress-v3',history);save('ian-misses-v3',misses);save('ian-attempts-
 if(lesson===li){mode='listen';makeQueue()}alert('已重置 '+title+' 的 IAN 學習熟練度。');
 };
 $('restoreAutoUnlock').onclick=()=>changeStageAccess(Number($('editLesson').value),null);
-$('editLesson').onchange=()=>{editPosition=null;$('stageAccessStatus').textContent='';drawAdminList()};$('saveWord').onclick=()=>{let li=Number($('editLesson').value),en=$('editEnglish').value.trim(),zh=$('editChinese').value.trim();if(!en||!zh){alert('請填寫英文與中文');return}if(!/^[a-zA-Z]+(?:[-'][a-zA-Z]+)*$/.test(en)){alert('英文欄位只接受英文字母、連字號及撇號');return}if(editPosition){let p=editPosition,g=lessons[p.li].words[p.i];if(g.variants)g.variants[p.j]={en,zh};else lessons[p.li].words[p.i]={en,zh}}else{lessons[li].words.push({en,zh})}save('ian-lessons-v3',lessons);editPosition=null;$('editEnglish').value='';$('editChinese').value='';drawAdminList();$('lesson').innerHTML=lessons.map((l,i)=>'<option value="'+i+'">'+l.title+'</option>').join('')};
+$('editLesson').onchange=()=>{editPosition=null;$('stageAccessStatus').textContent='';drawAdminList()};$('saveWord').onclick=()=>{let li=Number($('editLesson').value),en=normalizeSpelling($('editEnglish').value),zh=$('editChinese').value.trim();if(!en||!zh){alert('請填寫英文與中文');return}if(en.length>100||!/^[a-zA-Z]+(?:[-' ][a-zA-Z]+)*$/.test(en)){alert('英文欄位接受英文字母、單字間空格、連字號及撇號（最多 100 字元）');return}if(editPosition){let p=editPosition,g=lessons[p.li].words[p.i];if(g.variants)g.variants[p.j]={en,zh};else lessons[p.li].words[p.i]={en,zh}}else{lessons[li].words.push({en,zh})}save('ian-lessons-v3',lessons);editPosition=null;$('editEnglish').value='';$('editChinese').value='';drawAdminList();$('lesson').innerHTML=lessons.map((l,i)=>'<option value="'+i+'">'+l.title+'</option>').join('')};
 $('cancelEdit').onclick=()=>{editPosition=null;$('editEnglish').value='';$('editChinese').value=''};
 $('addLesson').onclick=()=>{let title=prompt('新課名稱','第 '+(lessons.length+1)+' 課');if(!title)return;lessons.push({title,words:[]});save('ian-lessons-v3',lessons);editLessonSelect();$('editLesson').value=String(lessons.length-1);drawAdminList();$('lesson').innerHTML=lessons.map((l,i)=>'<option value="'+i+'">'+l.title+'</option>').join('')};
 $('exportData').onclick=()=>{const payload={version:3,lessons,history,misses,stageUnlock,attempts,stageAccess};const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));let a=document.createElement('a');a.href=url;a.download='ian-spelling-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500)};
