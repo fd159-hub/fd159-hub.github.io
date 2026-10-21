@@ -1,0 +1,4 @@
+# Local testing only. Copy to .dev.vars, replace all values, never commit it.
+ADMIN_PASSWORD=replace-with-a-new-strong-password
+IAN_PIN=replace-with-a-private-student-pin
+SESSION_SECRET=replace-with-at-least-32-random-characters

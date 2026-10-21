@@ -1,0 +1,52 @@
+{
+  "name": "ian-spelling-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": true,
+  "vars": {
+    "FRONTEND_ORIGIN": "https://ian-spelling.pages.dev",
+    "DEPLOYMENT_ENV": "production"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ian-spelling-db",
+      "database_id": "eef94075-5917-4a5c-89de-92c268041698",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "env": {
+    "staging": {
+      "name": "ian-spelling-api-staging",
+      "workers_dev": true,
+      "vars": {
+        "FRONTEND_ORIGIN": "https://ian-spelling-staging.pages.dev",
+        "DEPLOYMENT_ENV": "staging"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ian-spelling-db-staging",
+          "database_id": "9a721721-31ca-49e8-bbbc-a935abe7d1cc",
+          "migrations_dir": "migrations"
+        }
+      ]
+    },
+    "production": {
+      "name": "ian-spelling-api",
+      "workers_dev": true,
+      "vars": {
+        "FRONTEND_ORIGIN": "https://ian-spelling.pages.dev",
+        "DEPLOYMENT_ENV": "production"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ian-spelling-db",
+          "database_id": "eef94075-5917-4a5c-89de-92c268041698",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
+}
