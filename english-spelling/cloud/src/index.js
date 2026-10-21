@@ -17,7 +17,7 @@ async function session(req,env){
     const [body,sig,...extra]=token.split('.');if(!body||!sig||extra.length)return null;
     if(!await crypto.subtle.verify('HMAC',await hmac(env.SESSION_SECRET,'verify'),unb64(sig),enc.encode(body)))return null;
     const u=JSON.parse(new TextDecoder().decode(unb64(body)));
-    return u.exp>Date.now()/1000&&((u.sub==='ian'&&u.role==='student')||(u.sub==='admin'&&u.role==='admin'))?u:null;
+    return u.exp>Date.now()/1000&&u.aud===env.FRONTEND_ORIGIN&&((u.sub==='ian'&&u.role==='student')||(u.sub==='admin'&&u.role==='admin'))?u:null;
   }catch{return null}
 }
 async function bodyJson(req){
@@ -58,7 +58,7 @@ async function login(req,env){
   requireValue(result.attempts<=10,'登入嘗試過多，請 15 分鐘後再試',429);
   requireValue(typeof b.password==='string'&&b.password.length<=200&&secureEq(b.password,secret),'帳號或密碼錯誤',401);
   await env.DB.prepare('DELETE FROM login_limits WHERE ip=? OR reset_at<=?').bind(ip,now).run();
-  return json({token:await sign({sub:b.role==='admin'?'admin':'ian',role:b.role,exp:now+43200},env.SESSION_SECRET),role:b.role,expiresIn:43200});
+  return json({token:await sign({sub:b.role==='admin'?'admin':'ian',role:b.role,aud:env.FRONTEND_ORIGIN,exp:now+43200},env.SESSION_SECRET),role:b.role,expiresIn:43200});
 }
 async function attempt(req,env){
   const b=await bodyJson(req);
@@ -159,7 +159,7 @@ async function handle(req,env){
     await env.DB.prepare('SELECT missed FROM progress LIMIT 1').all();
     await env.DB.prepare('SELECT id FROM imports LIMIT 1').all();
     await env.DB.prepare('SELECT allowed FROM stage_access LIMIT 1').all();
-    return json({ok:true,db:true,schema:3,version:packageInfo.version});
+    return json({ok:true,db:true,schema:3,version:packageInfo.version,environment:env.DEPLOYMENT_ENV||'local'});
   }
   if(path==='/api/login'&&req.method==='POST')return login(req,env);
   const u=await session(req,env);requireValue(u,'登入已失效',401);

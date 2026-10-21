@@ -1,5 +1,18 @@
 # 單字星球雲端後端驗收紀錄
 
+## 2026-10-21：正式／測試兩站並行
+
+- 依使用者指示建立獨立 production Worker、D1 與 Pages，保留既有 staging；配置及操作方式見 DEPLOYMENTS.md。
+- 預設 deploy／migrate 只操作 staging；正式須明確使用 production 指令。前端部署固定只上傳 index.html 與 cloud-client.js。
+- 正式站與測試站的固定網址自動連到各自 API，畫面與 health 標示環境。CORS 與 session audience 隔離，兩站不共用資料庫或登入狀態。
+- 回歸測試：13 項 API、8 組 workerd/D1、13 組 Chromium、語法及打包通過；新增兩環境資料異動／重置不互相影響、不同來源與跨站 token 拒絕、兩個固定網址不需 cloud 參數且不落入本機模式。
+- 08:44:28（Asia/Taipei）完整雲端 SQL 備份為 19487 bytes，包含 10 課、82 字、8 筆作答、9 筆進度、7 筆手動開關。來源 D1 未寫入。
+- 以該 SQL 在本機 SQLite 還原、檢查外鍵後，只還原到全新空白 production D1；完整 schema、資料列及 sequence 比對一致，遠端外鍵檢查通過。此項是真實雲端資料的備份／隔離復原演練，不是舊版 JSON 匯入。
+- 原瀏覽器舊 JSON 未覆蓋現有雲端；舊 JSON 的獨立匯入仍未執行。實體裝置觸控、語音與兩台真人裝置同步仍待驗收。
+- 本節完成的是配置及完整資料承接；實際雙站部署、登入與最終發布結果以本次 PR／Release 部署附錄為準。
+
+以下為歷史記錄，其中「正式站尚待指定」及舊測試組數均屬當時狀態，以上述最新雙站紀錄為準。
+
 ## 最新：v1.0.0 版本基準（2026-10-19）
 
 - package.json 與 lockfile 設定 version=1.0.0；雲端登入頁、管理頁及頁尾顯示版本，health 回傳 version。新增 CHANGELOG.md，列出 v1.0.0 功能基準與後續版本規則。

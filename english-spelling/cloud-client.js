@@ -1,22 +1,24 @@
 /* Optional cloud mode. The default URL remains the original local application. */
 (()=>{
   const APP_VERSION='1.0.0';
+  const DEFAULT_ENDPOINTS={'ian-spelling.pages.dev':'https://ian-spelling-api.fd159.workers.dev','ian-spelling-staging.pages.dev':'https://ian-spelling-api-staging.fd159.workers.dev'};
   const connect=document.createElement('button');connect.textContent='☁️ 連接雲端';connect.style.cssText='margin-top:12px;padding:10px;border-radius:12px';
   document.querySelector('.authCard').append(connect);
   connect.onclick=()=>{const value=prompt('請輸入已部署的 Worker 網址（https://…workers.dev）');if(value){const u=new URL(location.href);u.searchParams.set('cloud',value.trim());location.href=u.href}};
   if(!window.IAN_CLOUD_ACTIVE)return;
   let endpoint,token=null,loginRole='student',busy=false,pendingAttempt=null;
   try{
-    const u=new URL(new URLSearchParams(location.search).get('cloud'));
+    const u=new URL(new URLSearchParams(location.search).get('cloud')||DEFAULT_ENDPOINTS[location.hostname]);
     if(u.username||u.password||u.search||u.hash||u.pathname!=='/'||!(u.protocol==='https:'||(u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname))))throw Error('需要 HTTPS 網址；本機測試可使用 localhost');
     endpoint=u.origin;
   }catch{
     document.querySelector('.authCard').replaceChildren(Object.assign(document.createElement('p'),{textContent:'雲端網址無效，請移除網址的 cloud 參數後重試。'}));return;
   }
-  connect.textContent='回到本機版';connect.onclick=()=>{const u=new URL(location.href);u.searchParams.delete('cloud');location.href=u.href};
-  document.querySelector('.authCard>p:last-of-type').textContent='雲端版 v'+APP_VERSION+'：登入後同步至 '+endpoint;
-  document.querySelector('footer').textContent='雲端版 v'+APP_VERSION+'｜本機舊紀錄保留｜登入憑證只保留於本分頁記憶體';
-  const versionBadge=document.createElement('span');versionBadge.textContent='v'+APP_VERSION;versionBadge.style.cssText='font-size:16px;color:#66577d';document.querySelector('.adminHead h2').append(' ',versionBadge);
+  const environmentLabel=endpoint===DEFAULT_ENDPOINTS['ian-spelling.pages.dev']?'正式站':endpoint===DEFAULT_ENDPOINTS['ian-spelling-staging.pages.dev']?'測試站':'自訂雲端';
+  connect.textContent='開啟原本本機版';connect.onclick=()=>{if(DEFAULT_ENDPOINTS[location.hostname]){location.href='https://fd159-hub.github.io/english-spelling/';return}const u=new URL(location.href);u.searchParams.delete('cloud');location.href=u.href};
+  document.querySelector('.authCard>p:last-of-type').textContent=environmentLabel+' v'+APP_VERSION+'：登入後同步至 '+endpoint;
+  document.querySelector('footer').textContent=environmentLabel+' v'+APP_VERSION+'｜本機舊紀錄保留｜登入憑證只保留於本分頁記憶體';
+  const versionBadge=document.createElement('span');versionBadge.textContent=environmentLabel+' v'+APP_VERSION;versionBadge.style.cssText='font-size:16px;color:#66577d';document.querySelector('.adminHead h2').append(' ',versionBadge);
   document.querySelector('#adminScreen .adminShell>p').textContent='此頁修改會儲存至雲端。匯入僅接受尚無學習進度的資料庫；原瀏覽器紀錄不會刪除。';
   $('exportData').textContent='⬇ 匯出雲端備份';$('importData').textContent='⬆ 匯入舊版備份';
   const localLogout=logout;

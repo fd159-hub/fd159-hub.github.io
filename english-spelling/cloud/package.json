@@ -3,17 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "node scripts/preflight.mjs production && wrangler deploy",
-    "migrate": "node scripts/preflight.mjs production && wrangler d1 migrations apply ian-spelling-db --remote",
+    "dev": "wrangler dev --env staging",
+    "deploy": "npm run deploy:staging",
+    "migrate": "npm run migrate:staging",
     "test": "node --test tests/*.test.js",
     "check": "node --check src/index.js && node --check src/backup.js && node --check ../cloud-client.js",
-    "build": "wrangler deploy --dry-run --outdir dist",
-    "migrate:local": "wrangler d1 migrations apply ian-spelling-db --local",
+    "build": "wrangler deploy --env staging --dry-run --outdir dist",
+    "migrate:local": "wrangler d1 migrations apply ian-spelling-db-staging --env staging --local",
     "migrate:staging": "node scripts/preflight.mjs staging && wrangler d1 migrations apply ian-spelling-db-staging --env staging --remote",
-    "deploy:staging": "node scripts/preflight.mjs staging && wrangler deploy --env staging",
+    "deploy:staging": "node scripts/preflight.mjs staging && wrangler deploy --env staging && node scripts/deploy-frontend.mjs staging",
     "test:runtime": "node tests/runtime-check.mjs",
-    "test:browser": "node tests/browser-check.mjs"
+    "test:browser": "node tests/browser-check.mjs",
+    "deploy:production": "node scripts/preflight.mjs production && wrangler deploy --env production && node scripts/deploy-frontend.mjs production",
+    "migrate:production": "node scripts/preflight.mjs production && wrangler d1 migrations apply ian-spelling-db --env production --remote"
   },
   "devDependencies": {
     "wrangler": "4.151.1",

@@ -59,6 +59,26 @@ test('health queries schema; missing configuration fails closed',async()=>{
  const bare=database(':memory:',false);assert.equal((await request(environment(bare),'/api/health')).status,500);
 });
 
+test('production and staging isolate credentials, origins and data mutations',async()=>{
+ const production={...environment(),FRONTEND_ORIGIN:'https://ian-spelling.pages.dev',DEPLOYMENT_ENV:'production',SESSION_SECRET:'production-test-signing-secret-more-than-32-chars'};
+ const staging={...environment(),FRONTEND_ORIGIN:'https://ian-spelling-staging.pages.dev',DEPLOYMENT_ENV:'staging'};
+ const send=(env,path,body,token)=>request(env,path,body,token,body===undefined?'GET':'POST',{origin:env.FRONTEND_ORIGIN});
+ const prodToken=(await send(production,'/api/login',{role:'admin',password:production.ADMIN_PASSWORD})).body.token;
+ const stageToken=(await send(staging,'/api/login',{role:'admin',password:staging.ADMIN_PASSWORD})).body.token;
+ assert.equal((await send(production,'/api/health')).body.environment,'production');assert.equal((await send(staging,'/api/health')).body.environment,'staging');
+ assert.equal((await send(production,'/api/state',undefined,stageToken)).status,401);
+ assert.equal((await send({...production,SESSION_SECRET:staging.SESSION_SECRET},'/api/state',undefined,stageToken)).status,401);
+ assert.equal((await request(production,'/api/health',undefined,undefined,'GET',{origin:staging.FRONTEND_ORIGIN})).status,403);
+ assert.equal((await request(staging,'/api/health',undefined,undefined,'GET',{origin:production.FRONTEND_ORIGIN})).status,403);
+ await send(staging,'/api/admin/words',{lessonId:1,groupNo:99,spelling:'test only',meaning:'測試專用'},stageToken);
+ await send(staging,'/api/admin/stage-access',{lessonId:1,mode:'dictation',allowed:true},stageToken);
+ const student=(await send(staging,'/api/login',{role:'student',password:staging.IAN_PIN})).body.token;
+ await send(staging,'/api/attempt',{wordId:1,mode:'dictation',answer:'one',requestId:crypto.randomUUID()},student);
+ await send(staging,'/api/admin/reset',{lessonId:1},stageToken);
+ const prodState=(await send(production,'/api/state',undefined,prodToken)).body;
+ assert.equal(prodState.words.length,25);assert.equal(prodState.progress.length,0);assert.equal(prodState.stageAccess.length,0);
+});
+
 test('phrases save, normalize whitespace, work in every mode and survive backup import',async()=>{
  const env=environment(),admin=await login(env,'admin'),student=await login(env);
  await request(env,'/api/admin/lessons',{title:'片語測試課'},admin);

@@ -1,8 +1,12 @@
 # IAN 單字星球：Cloudflare Worker + D1
 
-雲端正式版以 **v1.0.0** 為起始基準，後續採 v1.0.x 修正、v1.x.0 新功能、v2.0.0 不相容變更。更新內容與發布狀態見 [CHANGELOG.md](CHANGELOG.md)。目前版本標示已備妥；正式站採用方式尚待使用者指定，版本號本身不代表已完成正式切換或未執行的驗收。
+雲端正式版以 **v1.0.0** 為起始基準，採正式／測試兩站並行；後續修改先部署測試站，驗證後才明確發布正式版。更新內容見 [CHANGELOG.md](CHANGELOG.md)，環境與發布流程見 [DEPLOYMENTS.md](DEPLOYMENTS.md)。
 
-此分支已包含可選雲端前端、後端、舊版備份匯入與自動測試。**staging 部署、登入、權限與 CORS 已驗證；真實備份匯入及後續資料驗收尚未完成，不要合併 main。** 實際執行狀態見 `TEST_REPORT.md`。
+兩站使用不同 Worker、D1、Secrets 與 CORS，資料在 2026-10-21 初次備份承接後各自獨立，不自動雙向同步。原 GitHub Pages 本機版與 localStorage 保留；PR 不因雲端雙站發布而自動合併 main。實際驗收狀態見 `TEST_REPORT.md`。
+
+- 正式站：https://ian-spelling.pages.dev/
+- 測試站：https://ian-spelling-staging.pages.dev/
+- 兩個固定網址會自動連到各自的 Worker，不需要加 cloud 參數；登入頁、管理頁、頁尾會標示環境與版本。
 
 ## 本機驗證
 
@@ -52,7 +56,7 @@ npm run migrate:local
 
 ```sh
 npm run migrate:local
-npx wrangler dev --port 8787 --var FRONTEND_ORIGIN:http://localhost:4173
+npm run dev -- --port 8787 --var FRONTEND_ORIGIN:http://localhost:4173
 # 另一個終端機，於儲存庫根目錄：
 python3 -m http.server 4173
 ```
@@ -94,7 +98,7 @@ npm run deploy:staging
 
 前端透過 `?cloud=https://實際Worker網址` 或登入頁的「連接雲端」切換。預覽站必須完整包含 `english-spelling/index.html` 與 `cloud-client.js`；只開目前 main 的正式網站不會出現尚未合併的功能。
 
-`npm run deploy`／`npm run migrate` 操作正式環境；本分支的 preflight 會拒絕佔位 UUID。**完成 staging 驗收並另行確認正式切換後才使用。**
+`npm run deploy`／`npm run migrate` 預設操作測試環境。正式發布必須明確執行 `npm run deploy:production`；正式 migration 為 `npm run migrate:production`。preflight 會拒絕無效 UUID 或兩環境共用資料庫／Worker／前端 origin。前端部署程式固定只上傳兩個公開檔案，不上傳 cloud 目錄。
 
 ## API
 

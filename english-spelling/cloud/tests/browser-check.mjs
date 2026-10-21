@@ -131,5 +131,14 @@ try{
  await phraseRow.getByRole('button',{name:'✏️ 修改',exact:true}).click();await page.locator('#editChinese').fill('鉛筆盒（片語）');await page.locator('#saveWord').click();
  await page.waitForFunction(()=>lessons[0].words.some(w=>w.en==='pencil case'&&w.zh==='鉛筆盒（片語）'));
  assert.equal((await db.prepare('SELECT meaning FROM words WHERE id=?').bind(phrase.id).first()).meaning,'鉛筆盒（片語）');groups++;
+ // Direct canonical URLs must never silently enter browser-local mode.
+ for(const [hostname,label,worker] of [['ian-spelling.pages.dev','正式站','ian-spelling-api.fd159.workers.dev'],['ian-spelling-staging.pages.dev','測試站','ian-spelling-api-staging.fd159.workers.dev']]){
+   const isolated=await browser.newContext();const p=await isolated.newPage();p.on('pageerror',e=>errors.push(e.message));
+   await p.route('https://'+hostname+'/**',async route=>{const path=new URL(route.request().url()).pathname;const file=path==='/cloud-client.js'?'cloud-client.js':'index.html';await route.fulfill({status:200,contentType:file.endsWith('.js')?'text/javascript':'text/html',body:await readFile(root+'english-spelling/'+file)})});
+   await p.goto('https://'+hostname+'/');assert.equal(await p.evaluate(()=>IAN_CLOUD_ACTIVE),true);
+   assert((await p.locator('footer').textContent()).startsWith(label+' v1.0.0'));
+   assert((await p.locator('.authCard>p:last-of-type').textContent()).includes(worker));
+   assert.equal(await p.evaluate(()=>localStorage.length),0);await isolated.close();groups++;
+ }
  assert.deepEqual(errors,[]);console.log('PASS: '+groups+' browser integration groups; no page errors; localStorage unchanged in cloud mode');
 }finally{await browser?.close();await new Promise(r=>staticServer.close(r));await new Promise(r=>apiServer.close(r));await mf.dispose()}
